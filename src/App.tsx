@@ -1,6 +1,7 @@
 // src/App.tsx
 import { useState } from 'react';
 import Header from './components/Header';
+import BottomNav from './components/BottomNav';
 import { WorkoutView } from './components/WorkoutView';
 import { MetricsGrid } from './components/MetricsGrid';
 import { HeroBanner } from './components/HeroBanner';
@@ -11,7 +12,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-12">
+    <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-20 md:pb-12">
       <Header activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="max-w-6xl mx-auto px-4 pt-8">
@@ -30,6 +31,13 @@ export function App() {
 
         {activeTab === 'workout' && <WorkoutView />}
 
+        {activeTab === 'gps' && (
+          <div className="p-8 bg-white rounded-2xl border border-[#E2E8F0] text-center">
+            <h2 className="text-xl font-bold">GPS Tracking</h2>
+            <p className="text-sm text-[#707072] mt-2">Pelacakan rute lari dan aktivitas outdoor.</p>
+          </div>
+        )}
+
         {activeTab === 'nutrition' && (
           <div className="p-8 bg-white rounded-2xl border border-[#E2E8F0] text-center">
             <h2 className="text-xl font-bold">Menu Nutrisi</h2>
@@ -44,6 +52,8 @@ export function App() {
           </div>
         )}
       </main>
+
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
 }
