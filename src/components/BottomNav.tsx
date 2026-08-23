@@ -1,18 +1,19 @@
+// src/components/BottomNav.tsx
 import React from 'react';
-import { TrendingUp, Dumbbell, Compass, Utensils, User } from 'lucide-react';
+import { LayoutDashboard, Dumbbell, Compass, Utensils, User } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: string;
-  setActiveTab: (tab: any) => void;
+  setActiveTab: (tab: string) => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
   const navItems = [
-    { id: 'home', label: 'Home', icon: TrendingUp },
+    { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'workout', label: 'Workout', icon: Dumbbell },
     { id: 'gps', label: 'GPS', icon: Compass },
     { id: 'nutrition', label: 'Nutrition', icon: Utensils },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'progress', label: 'Profile', icon: User },
   ];
 
   return (
@@ -34,3 +35,5 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
     </div>
   );
 };
+
+export default BottomNav;
