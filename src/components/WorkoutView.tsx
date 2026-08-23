@@ -259,7 +259,7 @@ export const WorkoutView: React.FC = () => {
                 </span>
                 {isCloudSynced && (
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center gap-1 border border-emerald-500/30">
-                    <CloudCheck className="w-3 h-3" /> TERSINKRON CLOUD
+                    <CheckCircle2 className="w-3 h-3" /> TERSINKRON CLOUD
                   </span>
                 )}
                 <span className="text-xs text-[#707072] font-mono">Disimpan: {savedProgram.savedAt}</span>
