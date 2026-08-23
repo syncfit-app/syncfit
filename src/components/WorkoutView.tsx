@@ -10,8 +10,10 @@ import {
   X, 
   Calendar, 
   Sparkles,
-  Trophy
+  Trophy,
+  CloudCheck
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { 
   FitnessGoal, 
   ExperienceLevel, 
@@ -48,32 +50,81 @@ export const WorkoutView: React.FC = () => {
   // Video Modal & Storage States
   const [selectedVideo, setSelectedVideo] = useState<{ name: string; url: string } | null>(null);
   const [savedProgram, setSavedProgram] = useState<SavedProgram | null>(null);
+  const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
 
-  // Load Saved Program & Sinkronkan State Dropdown dari LocalStorage saat Mount
+  // Load Saved Program (Supabase DB Priority, LocalStorage Fallback)
   useEffect(() => {
-    const localData = localStorage.getItem('syncfit_active_program');
-    if (localData) {
-      try {
-        const parsed: SavedProgram = JSON.parse(localData);
-        setSavedProgram(parsed);
+    const loadProgramData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user;
 
-        // Patch Fase 1: Isi kembali nilai dropdown agar sesuai dengan program yang tersimpan
-        if (parsed.meta) {
-          setGoal(parsed.meta.goal);
-          setLevel(parsed.meta.level);
-          setDays(parsed.meta.days);
-          setDuration(parsed.meta.duration);
-          setEquipment(parsed.meta.equipment);
+      if (currentUser) {
+        // 1. Ambil data program aktif dari Supabase
+        const { data: programData } = await supabase
+          .from('user_programs')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+        // 2. Ambil data log latihan dari Supabase
+        const { data: logsData } = await supabase
+          .from('exercise_logs')
+          .select('exercise_key')
+          .eq('user_id', currentUser.id);
+
+        if (programData) {
+          const loadedMeta = {
+            goal: programData.goal as FitnessGoal,
+            level: programData.level as ExperienceLevel,
+            days: programData.days,
+            duration: programData.duration as SessionDuration,
+            equipment: programData.equipment as EquipmentType,
+          };
+
+          // Sinkronkan UI State
+          setGoal(loadedMeta.goal);
+          setLevel(loadedMeta.level);
+          setDays(loadedMeta.days);
+          setDuration(loadedMeta.duration);
+          setEquipment(loadedMeta.equipment);
+
+          const completedKeys = logsData ? logsData.map(l => l.exercise_key) : [];
+
+          setSavedProgram({
+            savedAt: programData.saved_at,
+            meta: loadedMeta,
+            completedExercises: completedKeys,
+          });
+          setIsCloudSynced(true);
+          return;
         }
-      } catch (e) {
-        console.error("Gagal memuat program tersimpan", e);
       }
-    }
+
+      // 3. Fallback: Baca dari LocalStorage jika belum login / belum ada data cloud
+      const localData = localStorage.getItem('syncfit_active_program');
+      if (localData) {
+        try {
+          const parsed: SavedProgram = JSON.parse(localData);
+          setSavedProgram(parsed);
+          if (parsed.meta) {
+            setGoal(parsed.meta.goal);
+            setLevel(parsed.meta.level);
+            setDays(parsed.meta.days);
+            setDuration(parsed.meta.duration);
+            setEquipment(parsed.meta.equipment);
+          }
+        } catch (e) {
+          console.error("Gagal memuat program lokal", e);
+        }
+      }
+      setIsCloudSynced(false);
+    };
+
+    loadProgramData();
   }, []);
 
   const availableDays = getAvailableDays(level);
 
-  // Synchronize available days dropdown when level changes
   const handleLevelChange = (newLevel: ExperienceLevel) => {
     setLevel(newLevel);
     const newDaysOptions = getAvailableDays(newLevel);
@@ -90,32 +141,65 @@ export const WorkoutView: React.FC = () => {
     }
   };
 
-  // Generate Workout Plan dynamically via Engine
   const plan = generateWorkoutPlan(goal, level, days, duration, equipment, activeWeek);
   const activeDaySchedule = plan.schedule.find(s => s.dayNumber === selectedDayNumber) || plan.schedule[0];
 
-  // Save Program Action
-  const handleSaveProgram = () => {
+  // Save Program Action (Hybrid: LocalStorage & Supabase)
+  const handleSaveProgram = async () => {
+    const dateFormatted = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
     const newSavedProgram: SavedProgram = {
-      savedAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+      savedAt: dateFormatted,
       meta: { goal, level, days, duration, equipment },
-      completedExercises: []
+      completedExercises: savedProgram?.completedExercises || []
     };
+
+    // Simpan ke LocalStorage
     localStorage.setItem('syncfit_active_program', JSON.stringify(newSavedProgram));
     setSavedProgram(newSavedProgram);
-    alert('Program berhasil disimpan! Pilihan konfigurasi Anda kini akan tetap tersimpan.');
+
+    // Simpan ke Supabase jika terotentikasi
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { error } = await supabase.from('user_programs').upsert(
+        {
+          user_id: session.user.id,
+          goal,
+          level,
+          days,
+          duration,
+          equipment,
+          saved_at: dateFormatted,
+        },
+        { onConflict: 'user_id' }
+      );
+
+      if (error) {
+        console.error("Gagal menyimpan program ke Supabase:", error);
+      } else {
+        setIsCloudSynced(true);
+      }
+    }
+
+    alert('Program berhasil disimpan!');
   };
 
   // Reset Program Action
-  const handleResetProgram = () => {
+  const handleResetProgram = async () => {
     if (confirm('Apakah Anda yakin ingin mereset program aktif beserta seluruh riwayat progresnya?')) {
       localStorage.removeItem('syncfit_active_program');
       setSavedProgram(null);
+      setIsCloudSynced(false);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await supabase.from('user_programs').delete().eq('user_id', session.user.id);
+        await supabase.from('exercise_logs').delete().eq('user_id', session.user.id);
+      }
     }
   };
 
-  // Toggle Exercise Completion
-  const toggleExerciseCompletion = (exerciseId: string) => {
+  // Toggle Exercise Completion (Hybrid: Instant Local UI & Background Cloud Sync)
+  const toggleExerciseCompletion = async (exerciseId: string) => {
     if (!savedProgram) return;
 
     const key = `w${activeWeek}_d${selectedDayNumber}_${exerciseId}`;
@@ -127,6 +211,22 @@ export const WorkoutView: React.FC = () => {
     const updatedProgram = { ...savedProgram, completedExercises: updated };
     setSavedProgram(updatedProgram);
     localStorage.setItem('syncfit_active_program', JSON.stringify(updatedProgram));
+
+    // Sinkronkan ke Supabase jika terotentikasi
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      if (exists) {
+        await supabase
+          .from('exercise_logs')
+          .delete()
+          .eq('user_id', session.user.id)
+          .eq('exercise_key', key);
+      } else {
+        await supabase
+          .from('exercise_logs')
+          .insert([{ user_id: session.user.id, exercise_key: key }]);
+      }
+    }
   };
 
   // Progress Calculations
@@ -148,15 +248,20 @@ export const WorkoutView: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* 1. SAVED PROGRAM BANNER WITH DUAL PROGRESS INDICATORS */}
+      {/* 1. SAVED PROGRAM BANNER */}
       {savedProgram && (
         <div className="bg-[#111111] text-white p-6 rounded-[20px] border border-[#FF5E00]/40 shadow-xl space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 bg-[#FF5E00] text-white rounded-full flex items-center gap-1">
                   <Sparkles className="w-3 h-3" /> PROGRAM AKTIF BERJALAN
                 </span>
+                {isCloudSynced && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center gap-1 border border-emerald-500/30">
+                    <CloudCheck className="w-3 h-3" /> TERSINKRON CLOUD
+                  </span>
+                )}
                 <span className="text-xs text-[#707072] font-mono">Disimpan: {savedProgram.savedAt}</span>
               </div>
               <h3 className="text-xl font-bold uppercase tracking-tight mt-1 text-white">
@@ -173,7 +278,6 @@ export const WorkoutView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/10">
-            {/* Progress Hari Ini */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-mono">
                 <span className="text-[#CACACB]">HARI INI (W{activeWeek} - HARI {selectedDayNumber}): {completedActiveDayCount}/{totalActiveDayExercises} GERAKAN</span>
@@ -187,7 +291,6 @@ export const WorkoutView: React.FC = () => {
               </div>
             </div>
 
-            {/* Progress Total Program 4 Minggu */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-mono">
                 <span className="text-[#CACACB] flex items-center gap-1">
@@ -289,10 +392,10 @@ export const WorkoutView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. WEEKLY PROGRESSION TABS (W1-W4) */}
+      {/* 3. WEEKLY PROGRESSION TABS */}
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-xs font-bold uppercase text-[#707072]">
-          <Calendar className="w-4 h-4 text-[#FF5E00]" /> SIKLUS PROGRESI MINGGUAN (KLIK UNTUK MELIHAT PERUBAHAN PARAMETER)
+          <Calendar className="w-4 h-4 text-[#FF5E00]" /> SIKLUS PROGRESI MINGGUAN
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {plan.weeks.map(w => {
@@ -342,7 +445,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. EXERCISES LIST FOR SELECTED DAY */}
+      {/* 5. EXERCISES LIST */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -421,7 +524,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       </div>
 
-      {/* 6. VIDEO DEMO MODAL PLAYER */}
+      {/* 6. VIDEO DEMO MODAL */}
       {selectedVideo && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[20px] max-w-xl w-full p-6 space-y-4 relative shadow-2xl">
