@@ -1,7 +1,6 @@
 // src/components/Header.tsx
-
 import React, { useState, useEffect } from 'react';
-import { User as UserIcon, LogIn, LogOut } from 'lucide-react';
+import { LogIn, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AuthModal } from './AuthModal';
 import { User } from '@supabase/supabase-js';
@@ -90,3 +89,5 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     </>
   );
 };
+
+export default Header;
