@@ -34,23 +34,37 @@ interface SavedProgram {
 }
 
 export const WorkoutView: React.FC = () => {
+  // Configurator States
   const [goal, setGoal] = useState<FitnessGoal>('hypertrophy');
   const [level, setLevel] = useState<ExperienceLevel>('intermediate');
   const [days, setDays] = useState<number>(4);
   const [duration, setDuration] = useState<SessionDuration>(60);
   const [equipment, setEquipment] = useState<EquipmentType>('full_gym');
   
+  // Navigation States
   const [activeWeek, setActiveWeek] = useState<number>(1);
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
 
+  // Video Modal & Storage States
   const [selectedVideo, setSelectedVideo] = useState<{ name: string; url: string } | null>(null);
   const [savedProgram, setSavedProgram] = useState<SavedProgram | null>(null);
 
+  // Load Saved Program & Sinkronkan State Dropdown dari LocalStorage saat Mount
   useEffect(() => {
     const localData = localStorage.getItem('syncfit_active_program');
     if (localData) {
       try {
-        setSavedProgram(JSON.parse(localData));
+        const parsed: SavedProgram = JSON.parse(localData);
+        setSavedProgram(parsed);
+
+        // Patch Fase 1: Isi kembali nilai dropdown agar sesuai dengan program yang tersimpan
+        if (parsed.meta) {
+          setGoal(parsed.meta.goal);
+          setLevel(parsed.meta.level);
+          setDays(parsed.meta.days);
+          setDuration(parsed.meta.duration);
+          setEquipment(parsed.meta.equipment);
+        }
       } catch (e) {
         console.error("Gagal memuat program tersimpan", e);
       }
@@ -59,6 +73,7 @@ export const WorkoutView: React.FC = () => {
 
   const availableDays = getAvailableDays(level);
 
+  // Synchronize available days dropdown when level changes
   const handleLevelChange = (newLevel: ExperienceLevel) => {
     setLevel(newLevel);
     const newDaysOptions = getAvailableDays(newLevel);
@@ -75,9 +90,11 @@ export const WorkoutView: React.FC = () => {
     }
   };
 
+  // Generate Workout Plan dynamically via Engine
   const plan = generateWorkoutPlan(goal, level, days, duration, equipment, activeWeek);
   const activeDaySchedule = plan.schedule.find(s => s.dayNumber === selectedDayNumber) || plan.schedule[0];
 
+  // Save Program Action
   const handleSaveProgram = () => {
     const newSavedProgram: SavedProgram = {
       savedAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
@@ -86,9 +103,10 @@ export const WorkoutView: React.FC = () => {
     };
     localStorage.setItem('syncfit_active_program', JSON.stringify(newSavedProgram));
     setSavedProgram(newSavedProgram);
-    alert('Program berhasil disimpan! Anda sekarang dapat melacak kemajuan di siklus 4 minggu ini.');
+    alert('Program berhasil disimpan! Pilihan konfigurasi Anda kini akan tetap tersimpan.');
   };
 
+  // Reset Program Action
   const handleResetProgram = () => {
     if (confirm('Apakah Anda yakin ingin mereset program aktif beserta seluruh riwayat progresnya?')) {
       localStorage.removeItem('syncfit_active_program');
@@ -96,6 +114,7 @@ export const WorkoutView: React.FC = () => {
     }
   };
 
+  // Toggle Exercise Completion
   const toggleExerciseCompletion = (exerciseId: string) => {
     if (!savedProgram) return;
 
@@ -110,7 +129,7 @@ export const WorkoutView: React.FC = () => {
     localStorage.setItem('syncfit_active_program', JSON.stringify(updatedProgram));
   };
 
-  // Kalkulasi Progres Harian & Progres Total Siklus 4 Minggu
+  // Progress Calculations
   const totalActiveDayExercises = activeDaySchedule?.exercises.length || 0;
   const completedActiveDayCount = activeDaySchedule?.exercises.filter(ex => 
     savedProgram?.completedExercises.includes(`w${activeWeek}_d${selectedDayNumber}_${ex.id}`)
@@ -120,7 +139,6 @@ export const WorkoutView: React.FC = () => {
     ? Math.round((completedActiveDayCount / totalActiveDayExercises) * 100)
     : 0;
 
-  // Total Gerakan dalam 4 Minggu (4 Minggu * Total Gerakan Per Minggu)
   const totalWeeklyExercises = plan.schedule.reduce((acc, d) => acc + d.exercises.length, 0);
   const total4WeekExercises = totalWeeklyExercises * 4;
   const totalCompletedOverall = savedProgram?.completedExercises.length || 0;
