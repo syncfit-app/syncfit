@@ -10,7 +10,7 @@ import {
   X, 
   Calendar, 
   Sparkles,
-  Info
+  Trophy
 } from 'lucide-react';
 import { 
   FitnessGoal, 
@@ -30,26 +30,22 @@ interface SavedProgram {
     duration: SessionDuration;
     equipment: EquipmentType;
   };
-  completedExercises: string[]; // Key format: "w1_d1_bench_press"
+  completedExercises: string[]; // Format Key: "w1_d1_bench_press"
 }
 
 export const WorkoutView: React.FC = () => {
-  // Configurator States
   const [goal, setGoal] = useState<FitnessGoal>('hypertrophy');
   const [level, setLevel] = useState<ExperienceLevel>('intermediate');
   const [days, setDays] = useState<number>(4);
   const [duration, setDuration] = useState<SessionDuration>(60);
   const [equipment, setEquipment] = useState<EquipmentType>('full_gym');
   
-  // Navigation States
   const [activeWeek, setActiveWeek] = useState<number>(1);
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
 
-  // Video Modal & Storage States
   const [selectedVideo, setSelectedVideo] = useState<{ name: string; url: string } | null>(null);
   const [savedProgram, setSavedProgram] = useState<SavedProgram | null>(null);
 
-  // Load Saved Program from LocalStorage
   useEffect(() => {
     const localData = localStorage.getItem('syncfit_active_program');
     if (localData) {
@@ -63,7 +59,6 @@ export const WorkoutView: React.FC = () => {
 
   const availableDays = getAvailableDays(level);
 
-  // Synchronize available days dropdown when level changes
   const handleLevelChange = (newLevel: ExperienceLevel) => {
     setLevel(newLevel);
     const newDaysOptions = getAvailableDays(newLevel);
@@ -80,11 +75,9 @@ export const WorkoutView: React.FC = () => {
     }
   };
 
-  // Generate Workout Plan dynamically via Engine
   const plan = generateWorkoutPlan(goal, level, days, duration, equipment, activeWeek);
   const activeDaySchedule = plan.schedule.find(s => s.dayNumber === selectedDayNumber) || plan.schedule[0];
 
-  // Save Program Action
   const handleSaveProgram = () => {
     const newSavedProgram: SavedProgram = {
       savedAt: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
@@ -93,18 +86,16 @@ export const WorkoutView: React.FC = () => {
     };
     localStorage.setItem('syncfit_active_program', JSON.stringify(newSavedProgram));
     setSavedProgram(newSavedProgram);
-    alert('Program berhasil disimpan! Sekarang Anda dapat mencatat riwayat progres harian.');
+    alert('Program berhasil disimpan! Anda sekarang dapat melacak kemajuan di siklus 4 minggu ini.');
   };
 
-  // Reset Program Action
   const handleResetProgram = () => {
-    if (confirm('Apakah Anda yakin ingin menghapus program berjalan ini dan mereset progres?')) {
+    if (confirm('Apakah Anda yakin ingin mereset program aktif beserta seluruh riwayat progresnya?')) {
       localStorage.removeItem('syncfit_active_program');
       setSavedProgram(null);
     }
   };
 
-  // Toggle Exercise Completion
   const toggleExerciseCompletion = (exerciseId: string) => {
     if (!savedProgram) return;
 
@@ -119,7 +110,7 @@ export const WorkoutView: React.FC = () => {
     localStorage.setItem('syncfit_active_program', JSON.stringify(updatedProgram));
   };
 
-  // Calculate Progress percentage for active day
+  // Kalkulasi Progres Harian & Progres Total Siklus 4 Minggu
   const totalActiveDayExercises = activeDaySchedule?.exercises.length || 0;
   const completedActiveDayCount = activeDaySchedule?.exercises.filter(ex => 
     savedProgram?.completedExercises.includes(`w${activeWeek}_d${selectedDayNumber}_${ex.id}`)
@@ -129,11 +120,19 @@ export const WorkoutView: React.FC = () => {
     ? Math.round((completedActiveDayCount / totalActiveDayExercises) * 100)
     : 0;
 
+  // Total Gerakan dalam 4 Minggu (4 Minggu * Total Gerakan Per Minggu)
+  const totalWeeklyExercises = plan.schedule.reduce((acc, d) => acc + d.exercises.length, 0);
+  const total4WeekExercises = totalWeeklyExercises * 4;
+  const totalCompletedOverall = savedProgram?.completedExercises.length || 0;
+  const overallProgressPercentage = total4WeekExercises > 0 
+    ? Math.min(100, Math.round((totalCompletedOverall / total4WeekExercises) * 100))
+    : 0;
+
   return (
     <div className="space-y-8">
-      {/* 1. SAVED PROGRAM BANNER & PROGRESS TRACKER */}
+      {/* 1. SAVED PROGRAM BANNER WITH DUAL PROGRESS INDICATORS */}
       {savedProgram && (
-        <div className="bg-[#111111] text-white p-6 rounded-[20px] border border-[#FF5E00]/40 shadow-xl space-y-4">
+        <div className="bg-[#111111] text-white p-6 rounded-[20px] border border-[#FF5E00]/40 shadow-xl space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -155,16 +154,35 @@ export const WorkoutView: React.FC = () => {
             </button>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-white/10">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-[#CACACB]">PROGRES HARI INI (MINGGU {activeWeek} - HARI {selectedDayNumber}): {completedActiveDayCount}/{totalActiveDayExercises} GERAKAN</span>
-              <span className="text-[#FF5E00] font-bold">{dayProgressPercentage}% SELESAI</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/10">
+            {/* Progress Hari Ini */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-[#CACACB]">HARI INI (W{activeWeek} - HARI {selectedDayNumber}): {completedActiveDayCount}/{totalActiveDayExercises} GERAKAN</span>
+                <span className="text-[#FF5E00] font-bold">{dayProgressPercentage}%</span>
+              </div>
+              <div className="w-full h-2 bg-[#222222] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[#FF5E00] transition-all duration-500" 
+                  style={{ width: `${dayProgressPercentage}%` }}
+                />
+              </div>
             </div>
-            <div className="w-full h-2 bg-[#222222] rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-[#FF5E00] to-[#FF006B] transition-all duration-500" 
-                style={{ width: `${dayProgressPercentage}%` }}
-              />
+
+            {/* Progress Total Program 4 Minggu */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-[#CACACB] flex items-center gap-1">
+                  <Trophy className="w-3.5 h-3.5 text-[#FF006B]" /> TOTAL SIKLUS 4 MINGGU: {totalCompletedOverall}/{total4WeekExercises} GERAKAN
+                </span>
+                <span className="text-[#FF006B] font-bold">{overallProgressPercentage}%</span>
+              </div>
+              <div className="w-full h-2 bg-[#222222] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-[#FF5E00] to-[#FF006B] transition-all duration-500" 
+                  style={{ width: `${overallProgressPercentage}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -185,7 +203,6 @@ export const WorkoutView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {/* Goal Selector */}
           <div>
             <label className="text-xs font-bold uppercase text-[#707072] block mb-2">Fitness Goal</label>
             <select 
@@ -201,7 +218,6 @@ export const WorkoutView: React.FC = () => {
             </select>
           </div>
 
-          {/* Equipment Dropdown */}
           <div>
             <label className="text-xs font-bold uppercase text-[#707072] block mb-2">Peralatan (Equipment)</label>
             <select 
@@ -214,7 +230,6 @@ export const WorkoutView: React.FC = () => {
             </select>
           </div>
 
-          {/* Experience Selector */}
           <div>
             <label className="text-xs font-bold uppercase text-[#707072] block mb-2">Experience Level</label>
             <select 
@@ -228,7 +243,6 @@ export const WorkoutView: React.FC = () => {
             </select>
           </div>
 
-          {/* Dependent Days Dropdown */}
           <div>
             <label className="text-xs font-bold uppercase text-[#707072] block mb-2">Hari / Minggu</label>
             <select 
@@ -242,7 +256,6 @@ export const WorkoutView: React.FC = () => {
             </select>
           </div>
 
-          {/* Session Duration Selector */}
           <div>
             <label className="text-xs font-bold uppercase text-[#707072] block mb-2">Durasi / Sesi</label>
             <select 
@@ -288,11 +301,9 @@ export const WorkoutView: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. DAILY SPLIT TABS (Push/Pull/Legs/etc) */}
+      {/* 4. DAILY SPLIT TABS */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase text-[#707072]">PEMBAGIAN JADWAL SPLIT HARIAN ({days} HARI/MINGGU)</label>
-        </div>
+        <label className="text-xs font-bold uppercase text-[#707072] block">PEMBAGIAN JADWAL SPLIT HARIAN ({days} HARI/MINGGU)</label>
         <div className="flex gap-3 overflow-x-auto pb-2">
           {plan.schedule.map(s => {
             const isSelected = selectedDayNumber === s.dayNumber;
@@ -329,76 +340,67 @@ export const WorkoutView: React.FC = () => {
           </span>
         </div>
 
-        {activeDaySchedule?.exercises.length === 0 ? (
-          <div className="bg-white p-8 rounded-[16px] border border-[#E2E8F0] text-center text-[#707072] text-sm">
-            Tidak ada gerakan yang cocok untuk kombinasi filter peralatan dan target otot ini.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeDaySchedule?.exercises.map((ex, idx) => {
-              const completionKey = `w${activeWeek}_d${selectedDayNumber}_${ex.id}`;
-              const isCompleted = savedProgram?.completedExercises.includes(completionKey);
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {activeDaySchedule?.exercises.map((ex, idx) => {
+            const completionKey = `w${activeWeek}_d${selectedDayNumber}_${ex.id}`;
+            const isCompleted = savedProgram?.completedExercises.includes(completionKey);
 
-              return (
-                <div 
-                  key={ex.id} 
-                  className={`bg-white rounded-[16px] border p-5 flex gap-4 items-center transition-all ${
-                    isCompleted ? 'border-[#FF5E00] bg-[#FF5E00]/5' : 'border-[#E2E8F0]'
-                  }`}
-                >
-                  {/* Interactive Checklist button if program is saved */}
-                  {savedProgram ? (
-                    <button 
-                      onClick={() => toggleExerciseCompletion(ex.id)}
-                      className="shrink-0 transition-transform active:scale-95"
-                      title="Tandai Selesai"
+            return (
+              <div 
+                key={ex.id} 
+                className={`bg-white rounded-[16px] border p-5 flex gap-4 items-center transition-all ${
+                  isCompleted ? 'border-[#FF5E00] bg-[#FF5E00]/5' : 'border-[#E2E8F0]'
+                }`}
+              >
+                {savedProgram ? (
+                  <button 
+                    onClick={() => toggleExerciseCompletion(ex.id)}
+                    className="shrink-0 transition-transform active:scale-95"
+                    title="Tandai Selesai"
+                  >
+                    <CheckCircle2 className={`w-8 h-8 ${isCompleted ? 'text-[#FF5E00] fill-[#FF5E00]/20' : 'text-[#CACACB]'}`} />
+                  </button>
+                ) : (
+                  <div className="w-10 h-10 bg-[#111111] text-white rounded-full flex items-center justify-center font-mono font-bold text-sm shrink-0">
+                    0{idx + 1}
+                  </div>
+                )}
+
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-[#FF5E00]/10 text-[#FF5E00] rounded-full">
+                        {ex.muscleGroup}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase text-[#707072]">
+                        {ex.equipment === 'bodyweight' ? 'BODYWEIGHT' : ex.type}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedVideo({ name: ex.name, url: ex.videoUrl })}
+                      className="text-xs font-semibold text-[#FF5E00] hover:underline flex items-center gap-1"
                     >
-                      <CheckCircle2 className={`w-8 h-8 ${isCompleted ? 'text-[#FF5E00] fill-[#FF5E00]/20' : 'text-[#CACACB]'}`} />
+                      <Video className="w-3.5 h-3.5" /> Demo
                     </button>
-                  ) : (
-                    <div className="w-10 h-10 bg-[#111111] text-white rounded-full flex items-center justify-center font-mono font-bold text-sm shrink-0">
-                      0{idx + 1}
-                    </div>
-                  )}
+                  </div>
 
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-[#FF5E00]/10 text-[#FF5E00] rounded-full">
-                          {ex.muscleGroup}
-                        </span>
-                        <span className="text-[10px] font-bold uppercase text-[#707072]">
-                          {ex.equipment === 'bodyweight' ? 'BODYWEIGHT' : ex.type}
-                        </span>
-                      </div>
+                  <h4 className={`font-bold text-base ${isCompleted ? 'line-through text-[#707072]' : 'text-[#111111]'}`}>
+                    {ex.name}
+                  </h4>
 
-                      {/* Video Demo Button */}
-                      <button
-                        onClick={() => setSelectedVideo({ name: ex.name, url: ex.videoUrl })}
-                        className="text-xs font-semibold text-[#FF5E00] hover:underline flex items-center gap-1"
-                      >
-                        <Video className="w-3.5 h-3.5" /> Demo
-                      </button>
-                    </div>
-
-                    <h4 className={`font-bold text-base ${isCompleted ? 'line-through text-[#707072]' : 'text-[#111111]'}`}>
-                      {ex.name}
-                    </h4>
-
-                    {/* Sets, Reps, and RIR dynamically adjusted by selected Week */}
-                    <div className="font-mono text-xs text-[#707072] flex items-center gap-3 pt-1">
-                      <span className="font-bold text-[#111111]">{ex.sets} SETS</span>
-                      <span>•</span>
-                      <span>{ex.reps} REPS</span>
-                      <span>•</span>
-                      <span className="text-[#FF006B] font-bold">RIR {ex.rir}</span>
-                    </div>
+                  <div className="font-mono text-xs text-[#707072] flex items-center gap-3 pt-1">
+                    <span className="font-bold text-[#111111]">{ex.sets} SETS</span>
+                    <span>•</span>
+                    <span>{ex.reps} REPS</span>
+                    <span>•</span>
+                    <span className="text-[#FF006B] font-bold">RIR {ex.rir}</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* 6. VIDEO DEMO MODAL PLAYER */}
