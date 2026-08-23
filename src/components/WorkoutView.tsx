@@ -11,7 +11,7 @@ import {
   Calendar, 
   Sparkles,
   Trophy,
-  CloudCheck
+  CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { 
