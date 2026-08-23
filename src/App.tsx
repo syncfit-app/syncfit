@@ -1,33 +1,60 @@
 import React from 'react';
+import { Flame, Dumbbell, Activity, Compass, Utensils, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#F8F9FA', padding: '24px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      {/* Top Navbar Header */}
-      <header style={{ backgroundColor: '#FFFFFF', padding: '16px 24px', borderRadius: '16px', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #FF5E00 0%, #FF006B 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', fontWeight: 'bold' }}>
-            SF
+    <div className="min-h-screen bg-[#F8F9FA] text-[#0F172A] font-sans antialiased">
+      {/* Top Header */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <img 
+              src="/logo.png" 
+              alt="SyncFit Logo" 
+              className="h-9 w-auto object-contain" 
+            />
+            <span className="font-bold text-xl tracking-tight text-[#0F172A]">
+              Sync<span className="text-[#FF5E00]">Fit</span>
+            </span>
           </div>
-          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#0F172A' }}>SyncFit</h1>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gradient-to-r from-[#FF5E00]/10 to-[#FF006B]/10 text-[#FF5E00] border border-[#FF5E00]/20">
+            100% Gratis & Unlocked
+          </span>
         </div>
-        <span style={{ fontSize: '12px', fontWeight: '600', padding: '6px 12px', borderRadius: '20px', backgroundColor: 'rgba(255, 94, 0, 0.1)', color: '#FF5E00' }}>
-          100% Gratis & Unlocked
-        </span>
       </header>
 
-      {/* Hero Welcome Card */}
-      <main style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <div style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '20px', border: '1px solid #E2E8F0', boxShadow: '0px 4px 20px rgba(0,0,0,0.03)', textAlign: 'center' }}>
-          <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: '#0F172A', marginBottom: '8px' }}>
-            Selamat Datang di SyncFit! 🔥
-          </h2>
-          <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>
-            Sistem kebugaran deterministik & pelacak aktivitas outdoor siap digunakan.
-          </p>
-          <button style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: 'linear-gradient(90deg, #FF5E00 0%, #FF006B 100%)', color: '#FFFFFF', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
+      {/* Main Content */}
+      <main className="max-w-md mx-auto px-4 py-6 space-y-6">
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 text-center space-y-4">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-[#FF5E00] to-[#FF006B] flex items-center justify-center text-white shadow-lg shadow-[#FF5E00]/20">
+            <Flame className="w-6 h-6 stroke-[2.5]" />
+          </div>
+          
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold text-[#0F172A]">Selamat Datang di SyncFit!</h1>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Sistem kebugaran deterministik & pelacak aktivitas outdoor siap digunakan.
+            </p>
+          </div>
+
+          <button className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#FF5E00] to-[#FF006B] text-white font-semibold shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2">
+            <Dumbbell className="w-5 h-5" />
             Mulai Program Latihan
           </button>
+        </div>
+
+        {/* Quick Feature Grid Preview */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 space-y-2">
+            <Activity className="w-5 h-5 text-[#FF5E00]" />
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Workout</div>
+            <div className="text-sm font-semibold text-slate-800">Determinis Plan</div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 space-y-2">
+            <Compass className="w-5 h-5 text-[#FF006B]" />
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">GPS Track</div>
+            <div className="text-sm font-semibold text-slate-800">Run & Ride</div>
+          </div>
         </div>
       </main>
     </div>
