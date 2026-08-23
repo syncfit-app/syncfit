@@ -1,6 +1,6 @@
 // src/App.tsx
-import React, { useState } from 'react';
-import { Header } from './components/Header';
+import { useState } from 'react';
+import Header from './components/Header';
 import { WorkoutView } from './components/WorkoutView';
 import { MetricsGrid } from './components/MetricsGrid';
 import { HeroBanner } from './components/HeroBanner';
@@ -8,7 +8,7 @@ import { DailyChallengeCard } from './components/DailyChallengeCard';
 import { NutritionSummaryCard } from './components/NutritionSummaryCard';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'workout' | 'nutrition' | 'progress'>('dashboard');
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-12">
@@ -47,3 +47,5 @@ export function App() {
     </div>
   );
 }
+
+export default App;
