@@ -6,7 +6,8 @@ import { ExercisePreview } from './components/ExercisePreview';
 import { DailyChallengeCard } from './components/DailyChallengeCard';
 import { NutritionSummaryCard } from './components/NutritionSummaryCard';
 import { BottomNav } from './components/BottomNav';
-import { Dumbbell, Compass, Utensils, User as UserIcon } from 'lucide-react';
+import { WorkoutView } from './components/WorkoutView';
+import { Compass, Utensils, User as UserIcon } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'workout' | 'gps' | 'nutrition' | 'profile'>('home');
@@ -31,17 +32,8 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB: WORKOUT ENGINE PLACEHOLDER */}
-        {activeTab === 'workout' && (
-          <div className="bg-white p-8 rounded-[20px] border border-[#E2E8F0] space-y-4">
-            <h2 className="text-2xl font-extrabold uppercase flex items-center gap-2">
-              <Dumbbell className="text-[#FF5E00]" /> WORKOUT ENGINE
-            </h2>
-            <p className="text-[#707072] text-sm">
-              Sistem Generator Latihan Deterministik (Tanpa AI) berbasis Aturan Split & Exercise Pool.
-            </p>
-          </div>
-        )}
+        {/* TAB: WORKOUT ENGINE */}
+        {activeTab === 'workout' && <WorkoutView />}
 
         {/* TAB: GPS TRACKER PLACEHOLDER */}
         {activeTab === 'gps' && (
