@@ -1,41 +1,45 @@
+// src/components/DailyChallengeCard.tsx
 import React from 'react';
-import { Trophy, CheckCircle2 } from 'lucide-react';
+import { Target, CheckCircle } from 'lucide-react';
 
 export const DailyChallengeCard: React.FC = () => {
   return (
-    <div className="bg-white rounded-[20px] border border-[#E2E8F0] p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold uppercase tracking-tight flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-[#FF006B]" /> TANTANGAN HARIAN
-        </h3>
-        <span className="text-xs font-mono font-semibold text-[#FF006B] bg-[#FF006B]/10 px-2 py-0.5 rounded-full">+150 XP</span>
+    <div className="bg-white p-6 border-2 border-[#111111] rounded-none md:rounded-lg">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Target className="w-5 h-5 text-[#FF5E00]" />
+          <h3 className="font-extrabold text-sm uppercase tracking-wider text-[#111111]">
+            Tantangan Harian
+          </h3>
+        </div>
+        <span className="text-xs font-black bg-[#111111] text-white px-2 py-0.5 uppercase">
+          Hari Ke-5
+        </span>
       </div>
 
-      <div className="space-y-3 pt-1">
-        <div className="flex items-center justify-between p-3 bg-[#F5F5F5] rounded-[12px]">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-[#10B981]" />
-            <span className="text-xs font-medium">Lakukan 40 Push-Up</span>
-          </div>
-          <span className="text-xs font-mono font-bold text-[#10B981]">SELESAI</span>
+      <div className="space-y-4">
+        <div className="p-3 bg-[#F5F5F5] border border-[#E2E8F0]">
+          <p className="text-xs font-bold text-[#111111] uppercase">100 Push-Up Breakdown</p>
+          <p className="text-[11px] text-[#707072] mt-0.5">Bagi menjadi 4 set x 25 repetisi</p>
         </div>
 
-        <div className="flex items-center justify-between p-3 bg-[#F5F5F5] rounded-[12px]">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full border-2 border-[#CACACB]" />
-            <span className="text-xs font-medium">Minum Air 3 Liter</span>
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className="text-[#707072] uppercase">Progres</span>
+            <span className="text-[#111111]">75 / 100 Reps</span>
           </div>
-          <span className="text-xs font-mono text-[#707072]">2/3 L</span>
+          <div className="w-full bg-[#E2E8F0] h-3 border border-[#111111]">
+            <div className="bg-[#FF5E00] h-full w-[75%]" />
+          </div>
         </div>
 
-        <div className="flex items-center justify-between p-3 bg-[#F5F5F5] rounded-[12px]">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full border-2 border-[#CACACB]" />
-            <span className="text-xs font-medium">Lari / Jalan 3 KM</span>
-          </div>
-          <span className="text-xs font-mono text-[#707072]">0/3 KM</span>
-        </div>
+        <button className="w-full py-2.5 bg-[#111111] hover:bg-[#222222] text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+          <CheckCircle className="w-4 h-4 text-[#FF5E00]" />
+          <span>Tandai Selesai</span>
+        </button>
       </div>
     </div>
   );
 };
+
+export default DailyChallengeCard;
