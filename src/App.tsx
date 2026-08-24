@@ -12,32 +12,55 @@ import { GPSView } from './components/GPSView';
 import { NutritionView } from './components/NutritionView';
 import { ProgressView } from './components/ProgressView';
 import { LoginView } from './components/LoginView';
+import { OnboardingView } from './components/OnboardingView'; // IMPORT BARU
 import { Loader2 } from 'lucide-react';
 
 export function App() {
   const [session, setSession] = useState<any>(null);
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null); // STATE BARU
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
   useEffect(() => {
-    // 1. Cek sesi login aktif saat pertama kali aplikasi dimuat
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Fungsi untuk cek Sesi dan ketersediaan Profil di Supabase
+    const checkSessionAndProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
+      
+      if (session) {
+        // Cek apakah user id ini sudah ada di tabel profiles
+        const { data } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', session.user.id)
+          .single();
+          
+        setHasProfile(!!data); // Jika data ada = true, jika kosong = false
+      } else {
+        setHasProfile(null);
+      }
       setLoading(false);
-    });
+    };
 
-    // 2. Dengarkan perubahan sesi real-time (login / logout)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    checkSessionAndProfile();
+
+    // Dengarkan perubahan sesi secara real-time
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
+      setLoading(true);
+      if (session) {
+        const { data } = await supabase.from('profiles').select('id').eq('id', session.user.id).single();
+        setHasProfile(!!data);
+      } else {
+        setHasProfile(null);
+      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Tampilan layar pemuatan (Loading State)
+  // 1. Tampilan layar pemuatan (Loading State)
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center gap-3">
@@ -47,12 +70,17 @@ export function App() {
     );
   }
 
-  // Jika user belum login, tampilkan LoginView
+  // 2. Jika user belum login, tampilkan LoginView
   if (!session) {
-    return <LoginView onLogin={() => setLoading(false)} />;
+    return <LoginView onLogin={() => setLoading(true)} />;
   }
 
-  // Jika user sudah login, tampilkan Aplikasi Utama SyncFit
+  // 3. Jika user login TAPI belum punya profil, tampilkan OnboardingView
+  if (session && hasProfile === false) {
+    return <OnboardingView onComplete={() => setHasProfile(true)} />;
+  }
+
+  // 4. Jika user sudah login DAN punya profil, tampilkan Aplikasi Utama
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-20 md:pb-12">
       <Header activeTab={activeTab} setActiveTab={setActiveTab} />
