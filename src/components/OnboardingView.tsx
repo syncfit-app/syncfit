@@ -1,7 +1,7 @@
 // src/components/OnboardingView.tsx
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { ArrowRight, Loader2, User, Activity, Target } from 'lucide-react';
+import { ArrowRight, Loader2, User, Activity, Target, LogOut } from 'lucide-react';
 
 interface OnboardingViewProps {
   onComplete: () => void;
@@ -30,15 +30,13 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     setErrorMsg('');
 
     try {
-      // 1. Dapatkan data user yang sedang login
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Sesi tidak ditemukan. Silakan login ulang.');
 
-      // 2. Simpan data ke tabel profiles
       const { error: dbError } = await supabase
         .from('profiles')
         .upsert({
-          id: user.id, // WAJIB SAMA DENGAN UID AUTH
+          id: user.id,
           full_name: formData.full_name,
           age: parseInt(formData.age),
           weight_kg: parseFloat(formData.weight_kg),
@@ -49,7 +47,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
 
       if (dbError) throw dbError;
       
-      // 3. Beri tahu App.tsx bahwa profil sudah lengkap
       onComplete();
       
     } catch (error: any) {
@@ -57,6 +54,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     } finally {
       setLoading(false);
     }
+  };
+
+  // FUNGSI LOGOUT BARU
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
   };
 
   return (
@@ -73,13 +76,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         </div>
 
         {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-100">
-            {errorMsg}
+          <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-100 flex justify-between items-center">
+            <span>{errorMsg}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Baris 1: Nama Lengkap */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
               <User className="w-4 h-4 text-[#FF5E00]" /> Nama Lengkap
@@ -95,7 +97,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             />
           </div>
 
-          {/* Baris 2: Umur, Berat, Tinggi */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Umur (Tahun)</label>
@@ -135,7 +136,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
           </div>
 
-          {/* Baris 3: Aktivitas & Tujuan */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
@@ -172,20 +172,32 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 bg-[#FF5E00] hover:bg-[#E05300] text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_4px_14px_rgba(255,94,0,0.39)] disabled:opacity-70 mt-4"
-          >
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <span>Simpan Profil & Mulai</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
+          <div className="pt-2 space-y-3">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-[#FF5E00] hover:bg-[#E05300] text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_4px_14px_rgba(255,94,0,0.39)] disabled:opacity-70"
+            >
+              {loading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <span>Simpan Profil & Mulai</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+            
+            {/* TOMBOL KEMBALI / LOGOUT */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full py-3 bg-transparent hover:bg-gray-50 text-[#64748B] hover:text-[#111827] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Batalkan & Kembali ke Login</span>
+            </button>
+          </div>
         </form>
 
       </div>
