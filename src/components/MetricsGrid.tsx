@@ -10,6 +10,7 @@ export const MetricsGrid: React.FC = () => {
       unit: 'kcal',
       icon: Flame,
       color: 'text-[#FF5E00]',
+      bgIcon: 'bg-[#FF5E00]/10',
       subtext: '75% dari target 650 kcal',
     },
     {
@@ -18,23 +19,26 @@ export const MetricsGrid: React.FC = () => {
       unit: 'menit',
       icon: Activity,
       color: 'text-[#111111]',
+      bgIcon: 'bg-gray-100',
       subtext: 'Target harian 60 menit',
     },
     {
-      title: 'Detak Jantung Rata-Rata',
+      title: 'Heart Rate Avg',
       value: '128',
       unit: 'bpm',
       icon: Heart,
-      color: 'text-red-600',
+      color: 'text-red-500',
+      bgIcon: 'bg-red-50',
       subtext: 'Zona aerobik optimal',
     },
     {
-      title: 'Sesi Latihan Minggu Ini',
+      title: 'Sesi Latihan',
       value: '5',
       unit: 'sesi',
       icon: Trophy,
       color: 'text-[#FF5E00]',
-      subtext: '+2 sesi dibanding minggu lalu',
+      bgIcon: 'bg-[#FF5E00]/10',
+      subtext: '+2 sesi minggu ini',
     },
   ];
 
@@ -45,21 +49,23 @@ export const MetricsGrid: React.FC = () => {
         return (
           <div
             key={idx}
-            className="bg-white p-5 border-2 border-[#111111] rounded-none md:rounded-lg flex flex-col justify-between"
+            className="bg-white p-5 rounded-2xl border border-[#F1F5F9] shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col justify-between transition-all hover:shadow-md"
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#707072]">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#64748B]">
                 {metric.title}
               </span>
-              <Icon className={`w-5 h-5 ${metric.color}`} />
+              <div className={`p-2 rounded-xl ${metric.bgIcon}`}>
+                <Icon className={`w-4 h-4 ${metric.color}`} />
+              </div>
             </div>
 
-            <div className="flex items-baseline gap-1 my-1">
-              <span className="text-3xl font-black text-[#111111]">{metric.value}</span>
-              <span className="text-xs font-bold text-[#707072] uppercase">{metric.unit}</span>
+            <div className="flex items-baseline gap-1.5 mb-1">
+              <span className="text-3xl font-bold text-[#111827] tracking-tight">{metric.value}</span>
+              <span className="text-xs font-medium text-[#64748B]">{metric.unit}</span>
             </div>
 
-            <p className="text-[11px] font-semibold text-[#707072] mt-2 border-t border-[#E2E8F0] pt-2">
+            <p className="text-[11px] font-medium text-[#94A3B8] mt-2">
               {metric.subtext}
             </p>
           </div>
