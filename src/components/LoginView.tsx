@@ -1,7 +1,7 @@
 // src/components/LoginView.tsx
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Flame, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 interface LoginViewProps {
   onLogin: () => void;
@@ -40,13 +40,24 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-3xl border border-[#F1F5F9] shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#111827] to-[#1A1A1A] rounded-2xl flex items-center justify-center shadow-lg mb-4">
-            <Flame className="w-8 h-8 text-[#FF5E00]" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tight text-[#111827] uppercase">SyncFit</h1>
-          <p className="text-sm font-medium text-[#64748B] mt-1">
-            {isRegister ? 'Buat akun baru untuk memulai.' : 'Selamat datang kembali, Atlet.'}
+          
+          {/* 1. Menggunakan logo.png asli dari folder public */}
+          <img 
+            src="/logo.png" 
+            alt="SyncFit Logo" 
+            className="w-16 h-16 object-contain mb-3"
+          />
+          
+          {/* 2. Styling teks SYNCFIT disamakan dengan Header Dashboard */}
+          <h1 className="text-2xl font-black tracking-tight uppercase text-[#111827]">
+            SYNC<span className="text-[#FF5E00]">FIT</span>
+          </h1>
+          
+          {/* 3. Mengubah kata Atlet menjadi Warrior */}
+          <p className="text-sm font-medium text-[#64748B] mt-1 text-center">
+            {isRegister ? 'Buat akun baru untuk memulai.' : 'Selamat datang kembali, Warrior.'}
           </p>
+
         </div>
 
         {errorMsg && (
