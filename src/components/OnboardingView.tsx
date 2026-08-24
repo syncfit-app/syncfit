@@ -16,10 +16,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     age: '',
     weight_kg: '',
     height_cm: '',
-    fitness_goal: 'Hypertrophy',
-    activity_level: 'Aktif',
+    fitness_goal: 'Hypertrophy', // Sudah sesuai standar DB
+    activity_level: 'Moderate',  // Diubah ke Moderate (standar DB untuk Aktif)
     diet_type: 'Omnivore',
-    food_style: 'Indonesian Everyday', // DATA BARU UNTUK MENCEGAH EROR FOOD_STYLE
+    food_style: 'Indonesian Everyday',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -35,7 +35,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Sesi tidak ditemukan. Silakan login ulang.');
 
-      // Mengirimkan semua data termasuk diet_type dan food_style ke database
       const { error: dbError } = await supabase
         .from('profiles')
         .upsert({
@@ -47,7 +46,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
           fitness_goal: formData.fitness_goal,
           activity_level: formData.activity_level,
           diet_type: formData.diet_type,
-          food_style: formData.food_style, // WAJIB DIKIRIM
+          food_style: formData.food_style,
         });
 
       if (dbError) throw dbError;
@@ -142,7 +141,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
           </div>
 
-          {/* Baris 3: Aktivitas & Tujuan */}
+          {/* Baris 3: Aktivitas & Tujuan (VALUE TELAH DIPERBAIKI) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
@@ -154,10 +153,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                <option value="Sedentari">Sedentari (Jarang)</option>
-                <option value="Aktif Ringan">Aktif Ringan (1-3x/Mgg)</option>
-                <option value="Aktif">Aktif (3-5x/Mgg)</option>
-                <option value="Sangat Aktif">Sangat Aktif (Atlet)</option>
+                {/* VALUE menggunakan English (standar DB), label menggunakan Indonesia */}
+                <option value="Sedentary">Sedentari (Jarang)</option>
+                <option value="Light">Aktif Ringan (1-3x/Mgg)</option>
+                <option value="Moderate">Aktif (3-5x/Mgg)</option>
+                <option value="Very Active">Sangat Aktif (Atlet)</option>
               </select>
             </div>
             <div className="space-y-1.5">
@@ -170,11 +170,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
+                {/* VALUE diperbaiki menyesuaikan MEAL_TEMPLATE_LOGIC */}
                 <option value="Hypertrophy">Otot (Hypertrophy)</option>
                 <option value="Fat Loss">Lemak (Fat Loss)</option>
                 <option value="Strength">Kekuatan (Strength)</option>
-                <option value="Endurance">Kardio (Endurance)</option>
-                <option value="Maintenance">Pemeliharaan</option>
+                <option value="Body Recomposition">Re-komposisi Tubuh</option>
+                <option value="General Fitness">Pemeliharaan (Maintenance)</option>
               </select>
             </div>
           </div>
@@ -206,7 +207,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                {/* Opsi persis sesuai spesifikasi MEAL_TEMPLATE_LOGIC */}
                 <option value="Indonesian Everyday">Harian Indonesia</option>
                 <option value="High-Protein Fitness">Tinggi Protein (Fitness)</option>
                 <option value="Budget-Friendly">Ramah Kantong (Budget)</option>
