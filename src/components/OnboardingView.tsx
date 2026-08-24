@@ -18,7 +18,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     height_cm: '',
     fitness_goal: 'Hypertrophy',
     activity_level: 'Aktif',
-    diet_type: 'Omnivore', // DATA BARU UNTUK MENCEGAH EROR NOT-NULL
+    diet_type: 'Omnivore',
+    food_style: 'Indonesian Everyday', // DATA BARU UNTUK MENCEGAH EROR FOOD_STYLE
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -34,7 +35,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Sesi tidak ditemukan. Silakan login ulang.');
 
-      // Mengirimkan data termasuk diet_type ke database
+      // Mengirimkan semua data termasuk diet_type dan food_style ke database
       const { error: dbError } = await supabase
         .from('profiles')
         .upsert({
@@ -45,7 +46,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
           height_cm: parseFloat(formData.height_cm),
           fitness_goal: formData.fitness_goal,
           activity_level: formData.activity_level,
-          diet_type: formData.diet_type, // WAJIB DIKIRIM KARENA ATURAN SUPABASE
+          diet_type: formData.diet_type,
+          food_style: formData.food_style, // WAJIB DIKIRIM
         });
 
       if (dbError) throw dbError;
@@ -84,7 +86,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Baris 1 */}
+          {/* Baris 1: Nama Lengkap */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
               <User className="w-4 h-4 text-[#FF5E00]" /> Nama Lengkap
@@ -100,7 +102,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             />
           </div>
 
-          {/* Baris 2 */}
+          {/* Baris 2: Fisik */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Umur (Tahun)</label>
@@ -140,8 +142,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
           </div>
 
-          {/* Baris 3: Aktivitas, Tujuan, dan Diet */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Baris 3: Aktivitas & Tujuan */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
                 <Activity className="w-4 h-4 text-[#FF5E00]" /> Aktivitas
@@ -175,6 +177,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 <option value="Maintenance">Pemeliharaan</option>
               </select>
             </div>
+          </div>
+
+          {/* Baris 4: Preferensi Makanan */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
                 <Utensils className="w-4 h-4 text-[#FF5E00]" /> Diet
@@ -188,6 +194,22 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 <option value="Omnivore">Omnivora (Bebas)</option>
                 <option value="Vegetarian">Vegetarian</option>
                 <option value="Vegan">Vegan</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
+                <Utensils className="w-4 h-4 text-[#FF5E00]" /> Gaya Makanan
+              </label>
+              <select
+                name="food_style"
+                value={formData.food_style}
+                onChange={handleChange}
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
+              >
+                {/* Opsi persis sesuai spesifikasi MEAL_TEMPLATE_LOGIC */}
+                <option value="Indonesian Everyday">Harian Indonesia</option>
+                <option value="High-Protein Fitness">Tinggi Protein (Fitness)</option>
+                <option value="Budget-Friendly">Ramah Kantong (Budget)</option>
               </select>
             </div>
           </div>
