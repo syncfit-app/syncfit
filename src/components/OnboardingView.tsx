@@ -1,7 +1,7 @@
 // src/components/OnboardingView.tsx
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { ArrowRight, Loader2, User, Activity, Target, LogOut } from 'lucide-react';
+import { ArrowRight, Loader2, User, Activity, Target, LogOut, Utensils } from 'lucide-react';
 
 interface OnboardingViewProps {
   onComplete: () => void;
@@ -18,6 +18,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     height_cm: '',
     fitness_goal: 'Hypertrophy',
     activity_level: 'Aktif',
+    diet_type: 'Omnivore', // DATA BARU UNTUK MENCEGAH EROR NOT-NULL
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -33,6 +34,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error('Sesi tidak ditemukan. Silakan login ulang.');
 
+      // Mengirimkan data termasuk diet_type ke database
       const { error: dbError } = await supabase
         .from('profiles')
         .upsert({
@@ -43,6 +45,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
           height_cm: parseFloat(formData.height_cm),
           fitness_goal: formData.fitness_goal,
           activity_level: formData.activity_level,
+          diet_type: formData.diet_type, // WAJIB DIKIRIM KARENA ATURAN SUPABASE
         });
 
       if (dbError) throw dbError;
@@ -56,7 +59,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
     }
   };
 
-  // FUNGSI LOGOUT BARU
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.reload();
@@ -64,7 +66,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-3xl border border-[#F1F5F9] shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-2xl">
+      <div className="bg-white p-8 rounded-3xl border border-[#F1F5F9] shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-3xl">
         
         <div className="text-center mb-8">
           <h1 className="text-2xl md:text-3xl font-black tracking-tight uppercase text-[#111827]">
@@ -76,12 +78,13 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         </div>
 
         {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-100 flex justify-between items-center">
+          <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-100 flex justify-between items-center break-words">
             <span>{errorMsg}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Baris 1 */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
               <User className="w-4 h-4 text-[#FF5E00]" /> Nama Lengkap
@@ -97,6 +100,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             />
           </div>
 
+          {/* Baris 2 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Umur (Tahun)</label>
@@ -136,10 +140,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Baris 3: Aktivitas, Tujuan, dan Diet */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
-                <Activity className="w-4 h-4 text-[#FF5E00]" /> Tingkat Aktivitas
+                <Activity className="w-4 h-4 text-[#FF5E00]" /> Aktivitas
               </label>
               <select
                 name="activity_level"
@@ -147,15 +152,15 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                <option value="Sedentari">Sedentari (Jarang Bergerak)</option>
-                <option value="Aktif Ringan">Aktif Ringan (1-3x Seminggu)</option>
-                <option value="Aktif">Aktif (3-5x Seminggu)</option>
-                <option value="Sangat Aktif">Sangat Aktif (Atlet/Tiap Hari)</option>
+                <option value="Sedentari">Sedentari (Jarang)</option>
+                <option value="Aktif Ringan">Aktif Ringan (1-3x/Mgg)</option>
+                <option value="Aktif">Aktif (3-5x/Mgg)</option>
+                <option value="Sangat Aktif">Sangat Aktif (Atlet)</option>
               </select>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
-                <Target className="w-4 h-4 text-[#FF5E00]" /> Tujuan Utama
+                <Target className="w-4 h-4 text-[#FF5E00]" /> Tujuan
               </label>
               <select
                 name="fitness_goal"
@@ -163,11 +168,26 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                <option value="Hypertrophy">Membentuk Otot (Hypertrophy)</option>
-                <option value="Fat Loss">Menurunkan Lemak (Fat Loss)</option>
-                <option value="Strength">Meningkatkan Kekuatan (Strength)</option>
-                <option value="Endurance">Daya Tahan / Kardio (Endurance)</option>
-                <option value="Maintenance">Menjaga Kebugaran (Maintenance)</option>
+                <option value="Hypertrophy">Otot (Hypertrophy)</option>
+                <option value="Fat Loss">Lemak (Fat Loss)</option>
+                <option value="Strength">Kekuatan (Strength)</option>
+                <option value="Endurance">Kardio (Endurance)</option>
+                <option value="Maintenance">Pemeliharaan</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
+                <Utensils className="w-4 h-4 text-[#FF5E00]" /> Diet
+              </label>
+              <select
+                name="diet_type"
+                value={formData.diet_type}
+                onChange={handleChange}
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
+              >
+                <option value="Omnivore">Omnivora (Bebas)</option>
+                <option value="Vegetarian">Vegetarian</option>
+                <option value="Vegan">Vegan</option>
               </select>
             </div>
           </div>
@@ -188,7 +208,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
               )}
             </button>
             
-            {/* TOMBOL KEMBALI / LOGOUT */}
             <button
               type="button"
               onClick={handleLogout}
