@@ -7,6 +7,9 @@ import { MetricsGrid } from './components/MetricsGrid';
 import { HeroBanner } from './components/HeroBanner';
 import { DailyChallengeCard } from './components/DailyChallengeCard';
 import { NutritionSummaryCard } from './components/NutritionSummaryCard';
+import { GPSView } from './components/GPSView';
+import { NutritionView } from './components/NutritionView';
+import { ProgressView } from './components/ProgressView';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -30,27 +33,9 @@ export function App() {
         )}
 
         {activeTab === 'workout' && <WorkoutView />}
-
-        {activeTab === 'gps' && (
-          <div className="p-8 bg-white rounded-2xl border border-[#E2E8F0] text-center">
-            <h2 className="text-xl font-bold">GPS Tracking</h2>
-            <p className="text-sm text-[#707072] mt-2">Pelacakan rute lari dan aktivitas outdoor.</p>
-          </div>
-        )}
-
-        {activeTab === 'nutrition' && (
-          <div className="p-8 bg-white rounded-2xl border border-[#E2E8F0] text-center">
-            <h2 className="text-xl font-bold">Menu Nutrisi</h2>
-            <p className="text-sm text-[#707072] mt-2">Halaman manajemen nutrisi harian Anda.</p>
-          </div>
-        )}
-
-        {activeTab === 'progress' && (
-          <div className="p-8 bg-white rounded-2xl border border-[#E2E8F0] text-center">
-            <h2 className="text-xl font-bold">Progres Latihan</h2>
-            <p className="text-sm text-[#707072] mt-2">Pantau grafik perkembangan fisik Anda di sini.</p>
-          </div>
-        )}
+        {activeTab === 'gps' && <GPSView />}
+        {activeTab === 'nutrition' && <NutritionView />}
+        {activeTab === 'progress' && <ProgressView />}
       </main>
 
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
