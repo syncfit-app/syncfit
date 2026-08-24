@@ -4,36 +4,33 @@ import { Flame, ArrowRight } from 'lucide-react';
 
 export const HeroBanner: React.FC = () => {
   return (
-    <div className="bg-gradient-to-br from-[#111111] to-[#1A1A1A] text-white p-6 md:p-8 rounded-2xl shadow-lg relative overflow-hidden">
-      <div className="relative z-10 max-w-xl">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-sm text-white rounded-full text-[10px] font-bold uppercase tracking-wider mb-5 border border-white/10">
-          <Flame className="w-3.5 h-3.5 text-[#FF5E00]" />
-          <span>Program Harian</span>
+    <div className="bg-gradient-to-br from-[#111827] to-[#1A1A1A] rounded-3xl p-8 relative overflow-hidden shadow-lg border border-gray-800/50">
+      <div className="relative z-10 w-full md:w-2/3">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#FF5E00]/10 rounded-full mb-4 border border-[#FF5E00]/20">
+          <Flame className="w-4 h-4 text-[#FF5E00]" />
+          <span className="text-xs font-bold text-[#FF5E00] uppercase tracking-wider">
+            Program Harian
+          </span>
         </div>
         
-        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
-          Pushkan <span className="text-[#FF5E00]">Batasmu</span>
-        </h1>
+        {/* Teks diubah menjadi kapital semua sesuai permintaan */}
+        <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight uppercase">
+          PUSHKAN <span className="text-[#FF5E00]">BATASMU</span>
+        </h2>
         
-        <p className="text-sm md:text-base text-[#9CA3AF] mb-8 leading-relaxed max-w-md">
+        <p className="text-gray-400 text-sm md:text-base mb-6 leading-relaxed max-w-md">
           Selesaikan 45 menit latihan Full Body Strength hari ini untuk menjaga rentetan skor harian Anda.
         </p>
-
-        <button className="inline-flex items-center gap-2 px-6 py-3.5 bg-[#FF5E00] hover:bg-[#E05300] text-white rounded-xl font-bold text-sm transition-all shadow-[0_4px_14px_0_rgba(255,94,0,0.39)]">
-          <span>Mulai Sekarang</span>
+        <button className="bg-[#FF5E00] hover:bg-[#E05300] text-white px-6 py-3 rounded-xl font-bold text-sm inline-flex items-center gap-2 transition-all shadow-[0_4px_14px_rgba(255,94,0,0.39)]">
+          Mulai Sekarang
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
-
-      {/* Modern Background Accent */}
-      <div className="absolute right-[-10%] bottom-[-20%] text-white/5 font-black text-[150px] md:text-[200px] select-none pointer-events-none leading-none tracking-tighter">
-        FIT
-      </div>
       
-      {/* Subtle Glow */}
-      <div className="absolute right-0 top-0 w-64 h-64 bg-[#FF5E00]/10 blur-[80px] rounded-full pointer-events-none" />
+      {/* Dekorasi Background */}
+      <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none translate-x-1/4 translate-y-1/4">
+        <h1 className="text-[12rem] font-black text-white leading-none tracking-tighter">FIT</h1>
+      </div>
     </div>
   );
 };
-
-export default HeroBanner;
