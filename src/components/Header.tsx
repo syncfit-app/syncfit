@@ -24,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({ profile, onLogout }) => {
         <img 
           src="/logo.png" 
           alt="SyncFit Logo" 
-          className="h-8 md:h-12 w-auto object-contain" 
+          className="h-10 md:h-11 w-auto object-contain" 
           onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
         />
         <h1 className="text-xl md:text-2xl font-black tracking-tight text-[#111827] italic leading-none">
