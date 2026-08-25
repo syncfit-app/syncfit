@@ -19,16 +19,15 @@ export const Header: React.FC<HeaderProps> = ({ profile, onLogout }) => {
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 md:h-20 bg-white border-b border-[#F1F5F9] z-50 px-4 md:px-8 flex items-center justify-between shadow-sm">
-      {/* KIRI: Logo & Judul */}
-      <Link to="/" className="flex items-center gap-2 md:gap-2.5 shrink-0">
-        {/* Logo Ditambahkan Kembali */}
+      {/* KIRI: Logo & Judul yang sudah disejajarkan proporsional */}
+      <Link to="/" className="flex items-center gap-2 shrink-0">
         <img 
           src="/logo.png" 
           alt="SyncFit Logo" 
-          className="w-7 h-7 md:w-8 md:h-8 object-contain"
+          className="h-5 md:h-6 w-auto object-contain" 
           onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
         />
-        <h1 className="text-xl md:text-2xl font-black tracking-tight text-[#111827] italic pt-1">
+        <h1 className="text-xl md:text-2xl font-black tracking-tight text-[#111827] italic leading-none">
           SYNC<span className="text-[#FF5E00]">FIT</span>
         </h1>
       </Link>
