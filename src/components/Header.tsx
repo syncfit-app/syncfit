@@ -19,14 +19,21 @@ export const Header: React.FC<HeaderProps> = ({ profile, onLogout }) => {
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 md:h-20 bg-white border-b border-[#F1F5F9] z-50 px-4 md:px-8 flex items-center justify-between shadow-sm">
-      {/* KIRI: Logo */}
-      <Link to="/" className="flex items-center gap-2 shrink-0">
-        <h1 className="text-xl md:text-2xl font-black tracking-tight text-[#111827] italic">
+      {/* KIRI: Logo & Judul */}
+      <Link to="/" className="flex items-center gap-2 md:gap-2.5 shrink-0">
+        {/* Logo Ditambahkan Kembali */}
+        <img 
+          src="/logo.png" 
+          alt="SyncFit Logo" 
+          className="w-7 h-7 md:w-8 md:h-8 object-contain"
+          onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
+        />
+        <h1 className="text-xl md:text-2xl font-black tracking-tight text-[#111827] italic pt-1">
           SYNC<span className="text-[#FF5E00]">FIT</span>
         </h1>
       </Link>
       
-      {/* TENGAH: Menu Navigasi (Hanya Muncul di Desktop/Tablet) */}
+      {/* TENGAH: Menu Navigasi Desktop */}
       <nav className="hidden md:flex items-center gap-6 lg:gap-8">
         {navItems.map((item) => (
           <NavLink
@@ -45,14 +52,12 @@ export const Header: React.FC<HeaderProps> = ({ profile, onLogout }) => {
         ))}
       </nav>
 
-      {/* KANAN: User Profile & Logout (Tampil di Mobile & Desktop) */}
+      {/* KANAN: User Profile & Logout */}
       <div className="flex items-center gap-3 shrink-0">
-        {/* Username selalu tampil */}
-        <span className="text-sm font-bold text-[#111827] max-w-[100px] md:max-w-[150px] truncate">
+        <span className="text-sm font-bold text-[#111827] max-w-[100px] md:max-w-[150px] truncate hidden sm:block">
           {profile?.full_name || 'Warrior'}
         </span>
         
-        {/* Tombol Profil (Nantinya akan diganti foto saat fitur upload aktif) */}
         <Link 
           to="/profile" 
           className="p-2 bg-[#F8FAFC] border border-[#E2E8F0] hover:bg-[#F1F5F9] rounded-full text-[#64748B] transition-colors"
@@ -61,7 +66,6 @@ export const Header: React.FC<HeaderProps> = ({ profile, onLogout }) => {
           <User className="w-4 h-4 md:w-5 md:h-5" />
         </Link>
 
-        {/* Tombol Logout */}
         <button 
           onClick={onLogout} 
           className="p-2 text-[#94A3B8] hover:text-red-500 transition-colors"
