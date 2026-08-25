@@ -10,7 +10,7 @@ export const NutritionView: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="pt-4 pb-32 md:pt-6 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
       {/* Header Summary Nutrisi */}
       <div className="bg-white p-6 rounded-2xl border border-[#F1F5F9] shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -45,7 +45,8 @@ export const NutritionView: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl border border-[#F1F5F9] shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-bold text-base text-[#111827]">Log Makanan Hari Ini</h3>
-          <button className="px-3 py-1.5 bg-[#111827] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 hover:bg-[#1F2937]">
+          {/* Tombol Solid (Tanpa Gradasi) */}
+          <button className="px-4 py-2 bg-[#111111] hover:bg-[#222222] text-white rounded-full text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
             <Plus className="w-3.5 h-3.5" />
             <span>Tambah Makanan</span>
           </button>
@@ -61,13 +62,13 @@ export const NutritionView: React.FC = () => {
                     <Icon className="w-5 h-5 text-[#FF5E00]" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-sm text-[#111827]">{meal.title}</h4>
-                    <p className="text-xs text-[#64748B]">{meal.desc}</p>
+                    <h4 className="font-bold text-sm text-[#111827]">{meal.title}</h4>
+                    <p className="text-xs font-medium text-[#64748B]">{meal.desc}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="font-bold text-sm text-[#111827]">{meal.kcal} kcal</span>
-                  <p className="text-[10px] text-[#94A3B8]">{meal.time}</p>
+                  <p className="text-[10px] font-medium text-[#94A3B8]">{meal.time}</p>
                 </div>
               </div>
             );
