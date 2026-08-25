@@ -102,7 +102,8 @@ export function App() {
           <Route
             path="/"
             element={
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Tambahan pb-32 di sini agar tidak tertutup BottomNav */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-32">
                 <div className="lg:col-span-2 space-y-6">
                   <HeroBanner />
                   <MetricsGrid />
@@ -118,18 +119,18 @@ export function App() {
           <Route path="/gps" element={<GPSView />} />
           <Route path="/nutrition" element={<NutritionView />} />
           <Route path="/progress" element={<ProgressView />} />
-<Route 
-  path="/profile" 
-  element={
-    <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-      <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-xl">
-        {profile?.full_name?.charAt(0) || 'U'}
-      </div>
-      <h2 className="text-2xl font-bold">{profile?.full_name || 'Warrior'}</h2>
-      <p className="text-gray-500">Halaman Pengaturan Profil sedang dibangun...</p>
-    </div>
-  } 
-/>
+          <Route 
+            path="/profile" 
+            element={
+              <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 pb-32">
+                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-xl">
+                  {profile?.full_name?.charAt(0) || 'U'}
+                </div>
+                <h2 className="text-2xl font-bold">{profile?.full_name || 'Warrior'}</h2>
+                <p className="text-gray-500">Halaman Pengaturan Profil sedang dibangun...</p>
+              </div>
+            } 
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
