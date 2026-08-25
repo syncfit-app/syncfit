@@ -32,12 +32,12 @@ export const WorkoutView: React.FC = () => {
   return (
     <div className="pt-20 pb-24 md:pt-24 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6 bg-[#F8F9FA] min-h-screen">
       
-      {/* Active Program Header Banner - Nike Black */}
+      {/* Active Program Header Banner */}
       <div className="bg-[#111111] text-white p-6 md:p-8 rounded-2xl border border-[#E2E8F0] shadow-sm relative overflow-hidden">
         <div className="relative z-10 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-[#FF5E00] to-[#FF006B] text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FF5E00] text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
                 <Sparkles className="w-3.5 h-3.5" />
                 Program Aktif Berjalan
               </span>
@@ -59,7 +59,7 @@ export const WorkoutView: React.FC = () => {
             <p className="text-sm text-gray-400 mt-1 font-medium">Disimpan: 23 Agu 2026</p>
           </div>
 
-          {/* Progress Bars */}
+          {/* Progress Bar Solid (Tanpa Gradasi) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs font-bold">
@@ -67,7 +67,7 @@ export const WorkoutView: React.FC = () => {
                 <span className="text-[#FF5E00] font-mono">40%</span>
               </div>
               <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-gradient-to-r from-[#FF5E00] to-[#FF006B] h-full w-[40%] rounded-full transition-all duration-500" />
+                <div className="bg-[#FF5E00] h-full w-[40%] rounded-full transition-all duration-500" />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -95,14 +95,14 @@ export const WorkoutView: React.FC = () => {
               <p className="text-xs font-medium text-[#64748B]">Sesuaikan parameter dengan target Anda</p>
             </div>
           </div>
-          {/* Primary CTA Gradient Pill */}
-          <button className="px-6 py-2.5 bg-gradient-to-r from-[#FF5E00] to-[#FF006B] hover:opacity-90 text-white rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-2 transition-all">
+          {/* Tombol Solid (Tanpa Gradasi) */}
+          <button className="px-6 py-2.5 bg-[#FF5E00] hover:bg-[#E05300] text-white rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-2 transition-all shadow-sm">
             <Save className="w-4 h-4" />
             <span>Simpan Program Ini</span>
           </button>
         </div>
 
-        {/* Form Selects - Light Gray Inputs */}
+        {/* Form Selects */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
             { label: 'FITNESS GOAL', options: ['Hypertrophy (Muscular)', 'Strength Focus', 'Fat Loss'] },
@@ -227,7 +227,7 @@ export const WorkoutView: React.FC = () => {
                 </button>
               </div>
 
-              {/* Metrics with Font Mono */}
+              {/* Metrics */}
               <div className="flex items-center justify-between pt-3 border-t border-[#F5F5F5] text-[13px] font-bold font-mono">
                 <span className="text-[#111111]">{item.sets}</span>
                 <span className="text-[#CACACB]">•</span>
