@@ -102,7 +102,7 @@ export function App() {
           <Route
             path="/"
             element={
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-32">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-8">
                 <div className="lg:col-span-2 space-y-6">
                   <HeroBanner />
                   <MetricsGrid />
