@@ -1,39 +1,35 @@
 // src/components/BottomNav.tsx
 import React from 'react';
-import { LayoutDashboard, Dumbbell, Compass, Utensils, User } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, Dumbbell, Map, Utensils, Target } from 'lucide-react';
 
-interface BottomNavProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-}
-
-export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
+export const BottomNav: React.FC = () => {
   const navItems = [
-    { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-    { id: 'workout', label: 'Workout', icon: Dumbbell },
-    { id: 'gps', label: 'GPS', icon: Compass },
-    { id: 'nutrition', label: 'Nutrition', icon: Utensils },
-    { id: 'progress', label: 'Profile', icon: User },
+    { path: '/', label: 'HOME', icon: LayoutDashboard },
+    { path: '/workout', label: 'WORKOUT', icon: Dumbbell },
+    { path: '/gps', label: 'GPS', icon: Map },
+    { path: '/nutrition', label: 'NUTRITION', icon: Utensils },
+    { path: '/progress', label: 'PROGRESS', icon: Target },
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-[#E2E8F0] px-4 flex items-center justify-around z-50">
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = activeTab === item.id;
-        return (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`flex flex-col items-center gap-1 ${isActive ? 'text-[#FF5E00]' : 'text-[#707072]'}`}
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E2E8F0] z-50 md:hidden shadow-[0_-4px_20px_rgb(0,0,0,0.03)] pb-safe">
+      <div className="flex items-center justify-between px-2 h-[72px]">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) => 
+              `flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-all ${
+                isActive ? 'text-[#FF5E00]' : 'text-[#94A3B8] hover:text-[#64748B]'
+              }`
+            }
           >
-            <Icon className="w-5 h-5" />
-            <span className="text-[10px] font-semibold uppercase">{item.label}</span>
-          </button>
-        );
-      })}
-    </div>
+            <item.icon className="w-5 h-5" />
+            <span className="text-[9px] font-bold tracking-wider">{item.label}</span>
+          </NavLink>
+        ))}
+      </div>
+    </nav>
   );
 };
-
-export default BottomNav;
