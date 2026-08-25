@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ profile, onLogout }) => {
 
       {/* KANAN: User Profile & Logout */}
       <div className="flex items-center gap-3 shrink-0">
-        <span className="text-sm font-bold text-[#111827] max-w-[100px] md:max-w-[150px] truncate hidden sm:block">
+        <span className="text-sm font-bold text-[#111827] max-w-[90px] md:max-w-[150px] truncate block">
           {profile?.full_name || 'Warrior'}
         </span>
         
