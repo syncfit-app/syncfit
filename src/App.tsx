@@ -1,8 +1,9 @@
 // src/App.tsx
 import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
-import Header from './components/Header';
-import BottomNav from './components/BottomNav';
+import { Header } from './components/Header';
+import { BottomNav } from './components/BottomNav';
 import { WorkoutView } from './components/WorkoutView';
 import { MetricsGrid } from './components/MetricsGrid';
 import { HeroBanner } from './components/HeroBanner';
@@ -12,30 +13,38 @@ import { GPSView } from './components/GPSView';
 import { NutritionView } from './components/NutritionView';
 import { ProgressView } from './components/ProgressView';
 import { LoginView } from './components/LoginView';
-import { OnboardingView } from './components/OnboardingView'; // IMPORT BARU
+import { OnboardingView } from './components/OnboardingView';
 import { Loader2 } from 'lucide-react';
 
 export function App() {
   const [session, setSession] = useState<any>(null);
-  const [hasProfile, setHasProfile] = useState<boolean | null>(null); // STATE BARU
+  const [profile, setProfile] = useState<any>(null);
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  // Fungsi mengambil profil user
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (data) {
+      setProfile(data);
+      setHasProfile(true);
+    } else {
+      setHasProfile(false);
+    }
+  };
 
   useEffect(() => {
-    // Fungsi untuk cek Sesi dan ketersediaan Profil di Supabase
     const checkSessionAndProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       
       if (session) {
-        // Cek apakah user id ini sudah ada di tabel profiles
-        const { data } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', session.user.id)
-          .single();
-          
-        setHasProfile(!!data); // Jika data ada = true, jika kosong = false
+        await fetchProfile(session.user.id);
       } else {
         setHasProfile(null);
       }
@@ -44,15 +53,14 @@ export function App() {
 
     checkSessionAndProfile();
 
-    // Dengarkan perubahan sesi secara real-time
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setLoading(true);
       if (session) {
-        const { data } = await supabase.from('profiles').select('id').eq('id', session.user.id).single();
-        setHasProfile(!!data);
+        await fetchProfile(session.user.id);
       } else {
         setHasProfile(null);
+        setProfile(null);
       }
       setLoading(false);
     });
@@ -60,7 +68,11 @@ export function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 1. Tampilan layar pemuatan (Loading State)
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  // 1. Loading State
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center gap-3">
@@ -70,42 +82,48 @@ export function App() {
     );
   }
 
-  // 2. Jika user belum login, tampilkan LoginView
+  // 2. Jika belum login
   if (!session) {
     return <LoginView onLogin={() => setLoading(true)} />;
   }
 
-  // 3. Jika user login TAPI belum punya profil, tampilkan OnboardingView
+  // 3. Jika login tapi belum isi onboarding
   if (session && hasProfile === false) {
-    return <OnboardingView onComplete={() => setHasProfile(true)} />;
+    return <OnboardingView onComplete={() => fetchProfile(session.user.id)} />;
   }
 
-  // 4. Jika user sudah login DAN punya profil, tampilkan Aplikasi Utama
+  // 4. Tampilan Utama dengan Router
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-20 md:pb-12">
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-24 md:pb-12 pt-16 md:pt-20">
+      <Header profile={profile} onLogout={handleLogout} />
 
-      <main className="max-w-6xl mx-auto px-4 pt-8">
-        {activeTab === 'dashboard' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <HeroBanner />
-              <MetricsGrid />
-            </div>
-            <div className="space-y-6">
-              <DailyChallengeCard />
-              <NutritionSummaryCard />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'workout' && <WorkoutView />}
-        {activeTab === 'gps' && <GPSView />}
-        {activeTab === 'nutrition' && <NutritionView />}
-        {activeTab === 'progress' && <ProgressView />}
+      <main className="max-w-6xl mx-auto px-4 pt-6">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                  <HeroBanner />
+                  <MetricsGrid />
+                </div>
+                <div className="space-y-6">
+                  <DailyChallengeCard />
+                  <NutritionSummaryCard />
+                </div>
+              </div>
+            }
+          />
+          <Route path="/workout" element={<WorkoutView />} />
+          <Route path="/gps" element={<GPSView />} />
+          <Route path="/nutrition" element={<NutritionView />} />
+          <Route path="/progress" element={<ProgressView />} />
+          <Route path="/profile" element={<ProgressView />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNav />
     </div>
   );
 }
