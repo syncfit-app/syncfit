@@ -10,7 +10,7 @@ export const NutritionView: React.FC = () => {
   ];
 
   return (
-    <div className="pt-4 pb-32 md:pt-6 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
+    <div className="pt-0 pb-8 md:pt-6 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
       {/* Header Summary Nutrisi */}
       <div className="bg-white p-6 rounded-2xl border border-[#F1F5F9] shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-4">
