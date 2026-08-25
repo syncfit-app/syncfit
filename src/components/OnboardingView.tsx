@@ -11,15 +11,16 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
+  // PERBAIKAN 1: Default value menggunakan huruf kecil dan garis bawah sesuai SQL
   const [formData, setFormData] = useState({
     full_name: '',
     age: '',
     weight_kg: '',
     height_cm: '',
-    fitness_goal: 'Hypertrophy', // Sudah sesuai standar DB
-    activity_level: 'Moderate',  // Diubah ke Moderate (standar DB untuk Aktif)
-    diet_type: 'Omnivore',
-    food_style: 'Indonesian Everyday',
+    fitness_goal: 'hypertrophy',
+    activity_level: 'moderate',
+    diet_type: 'omnivore',
+    food_style: 'indonesian_everyday',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -85,7 +86,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Baris 1: Nama Lengkap */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
               <User className="w-4 h-4 text-[#FF5E00]" /> Nama Lengkap
@@ -101,7 +101,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             />
           </div>
 
-          {/* Baris 2: Fisik */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Umur (Tahun)</label>
@@ -141,7 +140,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             </div>
           </div>
 
-          {/* Baris 3: Aktivitas & Tujuan (VALUE TELAH DIPERBAIKI) */}
+          {/* PERBAIKAN 2: Semua opsi <option value="..."> disamakan persis dengan SQL Check Constraints */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
@@ -153,11 +152,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                {/* VALUE menggunakan English (standar DB), label menggunakan Indonesia */}
-                <option value="Sedentary">Sedentari (Jarang)</option>
-                <option value="Light">Aktif Ringan (1-3x/Mgg)</option>
-                <option value="Moderate">Aktif (3-5x/Mgg)</option>
-                <option value="Very Active">Sangat Aktif (Atlet)</option>
+                <option value="sedentary">Sedentari (Jarang)</option>
+                <option value="light">Aktif Ringan (1-3x/Mgg)</option>
+                <option value="moderate">Aktif (3-5x/Mgg)</option>
+                <option value="very_active">Sangat Aktif (Atlet)</option>
               </select>
             </div>
             <div className="space-y-1.5">
@@ -170,17 +168,15 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                {/* VALUE diperbaiki menyesuaikan MEAL_TEMPLATE_LOGIC */}
-                <option value="Hypertrophy">Otot (Hypertrophy)</option>
-                <option value="Fat Loss">Lemak (Fat Loss)</option>
-                <option value="Strength">Kekuatan (Strength)</option>
-                <option value="Body Recomposition">Re-komposisi Tubuh</option>
-                <option value="General Fitness">Pemeliharaan (Maintenance)</option>
+                <option value="hypertrophy">Otot (Hypertrophy)</option>
+                <option value="fat_loss">Lemak (Fat Loss)</option>
+                <option value="strength">Kekuatan (Strength)</option>
+                <option value="recomposition">Re-komposisi Tubuh</option>
+                <option value="general_fitness">Pemeliharaan (Maintenance)</option>
               </select>
             </div>
           </div>
 
-          {/* Baris 4: Preferensi Makanan */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
@@ -192,9 +188,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                <option value="Omnivore">Omnivora (Bebas)</option>
-                <option value="Vegetarian">Vegetarian</option>
-                <option value="Vegan">Vegan</option>
+                <option value="omnivore">Omnivora (Bebas)</option>
+                <option value="vegetarian">Vegetarian</option>
+                <option value="vegan">Vegan</option>
               </select>
             </div>
             <div className="space-y-1.5">
@@ -207,9 +203,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 onChange={handleChange}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
               >
-                <option value="Indonesian Everyday">Harian Indonesia</option>
-                <option value="High-Protein Fitness">Tinggi Protein (Fitness)</option>
-                <option value="Budget-Friendly">Ramah Kantong (Budget)</option>
+                <option value="indonesian_everyday">Harian Indonesia</option>
+                <option value="high_protein">Tinggi Protein (Fitness)</option>
+                <option value="budget_friendly">Ramah Kantong (Budget)</option>
               </select>
             </div>
           </div>
