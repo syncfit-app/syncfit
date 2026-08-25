@@ -1,11 +1,11 @@
 // src/components/GPSView.tsx
 import React from 'react';
-import { MapPin, Play, Activity, Flame, Navigation, Clock } from 'lucide-react';
+import { MapPin, Play, Flame, Navigation, Clock } from 'lucide-react';
 
 export const GPSView: React.FC = () => {
   return (
     <div className="pt-20 pb-24 md:pt-24 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6 bg-[#F8F9FA] min-h-screen">
-      {/* Header Banner - Nike Black Aesthetic */}
+      {/* Header Banner */}
       <div className="bg-[#111111] p-6 md:p-8 rounded-2xl border border-[#E2E8F0] shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div>
@@ -21,8 +21,8 @@ export const GPSView: React.FC = () => {
             </p>
           </div>
           
-          {/* Primary CTA Gradient Pill */}
-          <button className="px-8 py-3.5 bg-gradient-to-r from-[#FF5E00] to-[#FF006B] hover:opacity-90 text-white rounded-full font-bold text-[15px] flex items-center justify-center gap-2 transition-all w-full md:w-auto shrink-0">
+          {/* Tombol Solid (Tanpa Gradasi) */}
+          <button className="px-8 py-3.5 bg-[#FF5E00] hover:bg-[#E05300] text-white rounded-full font-bold text-[15px] flex items-center justify-center gap-2 transition-all w-full md:w-auto shrink-0 shadow-sm">
             <Play className="w-4 h-4 fill-current" />
             <span>MULAI JOG / LARI</span>
           </button>
@@ -37,7 +37,7 @@ export const GPSView: React.FC = () => {
         </div>
       </div>
 
-      {/* GPS Stats Grid - Flat Elevation */}
+      {/* GPS Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Jarak Bulan Ini', value: '38.4', unit: 'km', icon: Navigation, color: 'text-[#FF5E00]' },
@@ -53,7 +53,6 @@ export const GPSView: React.FC = () => {
               <stat.icon className={`w-4 h-4 ${stat.color}`} />
             </div>
             <div className="flex items-baseline gap-1">
-              {/* Font Mono untuk metrik angka */}
               <span className="text-2xl font-bold text-[#111111] tracking-tight font-mono">{stat.value}</span>
               <span className="text-xs font-semibold text-[#64748B]">{stat.unit}</span>
             </div>
