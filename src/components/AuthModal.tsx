@@ -1,7 +1,7 @@
 // src/components/AuthModal.tsx
 
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, LogIn, UserPlus, AlertCircle } from 'lucide-react';
+import { X, Mail, Lock, User, LogIn, UserPlus, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface AuthModalProps {
@@ -17,6 +17,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  // State baru untuk mengontrol tampilan password
+  const [showPassword, setShowPassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -140,14 +143,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             <div className="relative">
               <Lock className="w-4 h-4 text-[#707072] absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-[#F5F5F5] border border-[#E2E8F0] rounded-[12px] py-3 pl-10 pr-4 text-sm font-semibold text-[#111111] focus:outline-none focus:border-[#FF5E00]"
+                className="w-full bg-[#F5F5F5] border border-[#E2E8F0] rounded-[12px] py-3 pl-10 pr-10 text-sm font-semibold text-[#111111] focus:outline-none focus:border-[#FF5E00]"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#707072] hover:text-[#111111] transition-colors focus:outline-none"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
