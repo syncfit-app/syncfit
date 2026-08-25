@@ -51,7 +51,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             className="w-16 h-16 object-contain mb-3 drop-shadow-sm"
             onError={(e) => { e.currentTarget.src = '/logo.svg'; }} // Fallback jika ekstensi .svg
           />
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[#111827]">
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[#111827] italic leading-none">
   SYNC<span className="text-[#FF5E00]">FIT</span>
 </h1>
           <p className="text-sm font-medium text-[#64748B] mt-1">
