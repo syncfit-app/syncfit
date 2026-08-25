@@ -4,7 +4,7 @@ import { MapPin, Play, Flame, Navigation, Clock } from 'lucide-react';
 
 export const GPSView: React.FC = () => {
   return (
-    <div className="pt-20 pb-24 md:pt-24 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6 bg-[#F8F9FA] min-h-screen">
+    <div className="pt-4 pb-32 md:pt-6 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
       {/* Header Banner */}
       <div className="bg-[#111111] p-6 md:p-8 rounded-2xl border border-[#E2E8F0] shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
