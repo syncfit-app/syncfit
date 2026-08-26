@@ -31,7 +31,7 @@ export const WorkoutView: React.FC = () => {
 
   return (
     // WRAPPER INI SAMA PERSIS DENGAN DASHBOARD AGAR PADDING SERASI
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-8 pt-2">
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-8 pt-0">
       
       {/* 1. HEADER WORKOUT */}
       <div className="bg-[#111827] text-white p-6 sm:p-8 rounded-3xl shadow-sm relative overflow-hidden border border-slate-800">
