@@ -8,12 +8,23 @@ import {
   Flame, 
   CheckCircle2,
   Settings2,
-  Calendar
+  Calendar,
+  Video,
+  X
 } from 'lucide-react';
 
+interface Exercise {
+  name: string;
+  sets: number;
+  reps: string;
+  rest: string;
+  note: string;
+  videoUrl?: string;
+}
+
 export const WorkoutView: React.FC = () => {
-  // Mock data struktur Weekly Split
   const [selectedDay, setSelectedDay] = useState(0);
+  const [activeDemo, setActiveDemo] = useState<Exercise | null>(null);
 
   const mockWeeklySplit = [
     { dayLabel: "Hari 1", name: "Upper Body A", isToday: true, type: "Workout" },
@@ -25,14 +36,34 @@ export const WorkoutView: React.FC = () => {
 
   const activeWorkout = mockWeeklySplit[selectedDay];
 
-  const mockExercises = [
-    { name: "Barbell Bench Press", sets: 3, reps: "8-12", rest: "90s", note: "Fokus pada rentang gerak penuh" },
-    { name: "Incline Dumbbell Row", sets: 3, reps: "10-12", rest: "90s", note: "Tahan kontraksi di puncak" },
-    { name: "Overhead Shoulder Press", sets: 3, reps: "10-12", rest: "90s", note: "Jangan melengkungkan punggung" },
+  const mockExercises: Exercise[] = [
+    { 
+      name: "Barbell Bench Press", 
+      sets: 3, 
+      reps: "8-12", 
+      rest: "90s", 
+      note: "Fokus pada rentang gerak penuh",
+      videoUrl: "https://www.youtube.com/embed/rT7DgCr-3pg"
+    },
+    { 
+      name: "Incline Dumbbell Row", 
+      sets: 3, 
+      reps: "10-12", 
+      rest: "90s", 
+      note: "Tahan kontraksi di puncak",
+      videoUrl: "https://www.youtube.com/embed/rT7DgCr-3pg" 
+    },
+    { 
+      name: "Overhead Shoulder Press", 
+      sets: 3, 
+      reps: "10-12", 
+      rest: "90s", 
+      note: "Jangan melengkungkan punggung",
+      videoUrl: "https://www.youtube.com/embed/rT7DgCr-3pg" 
+    },
   ];
 
   return (
-    // Wadah disesuaikan: pt-0 pb-8
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-8 pt-0">
       
       {/* 1. HEADER WORKOUT */}
@@ -67,7 +98,6 @@ export const WorkoutView: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Tombol Atur / Generate Plan Modal Trigger */}
             <button 
               title="Atur Ulang Program"
               className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3.5 rounded-xl font-bold transition-all border border-slate-700 shrink-0"
@@ -82,7 +112,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. WEEKLY SPLIT STRIP (Navigasi Antar Hari) */}
+      {/* 2. WEEKLY SPLIT STRIP */}
       <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
@@ -117,7 +147,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. DAFTAR GERAKAN (Hanya muncul jika bukan Rest Day) */}
+      {/* 3. DAFTAR GERAKAN */}
       {activeWorkout.type === 'Rest' ? (
         <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm text-center space-y-2">
           <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
@@ -141,12 +171,25 @@ export const WorkoutView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {mockExercises.map((ex, idx) => (
               <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex gap-4 hover:border-slate-200 transition-colors">
+                {/* Nomor Urut */}
                 <div className="w-10 h-10 shrink-0 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-lg">
                   {idx + 1}
                 </div>
                 
+                {/* Detail Gerakan */}
                 <div className="flex-1 space-y-2">
-                  <h3 className="font-extrabold text-[#111827] text-base leading-tight">{ex.name}</h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-extrabold text-[#111827] text-base leading-tight">{ex.name}</h3>
+                    
+                    {/* Tombol Demo Video */}
+                    <button
+                      onClick={() => setActiveDemo(ex)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 hover:bg-[#FF5E00] text-[#FF5E00] hover:text-white rounded-xl text-xs font-extrabold transition-all border border-orange-100 shrink-0"
+                    >
+                      <Video className="w-3.5 h-3.5" />
+                      <span>Demo</span>
+                    </button>
+                  </div>
                   
                   <div className="flex flex-wrap gap-2 text-[11px] font-bold">
                     <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-100">
@@ -194,6 +237,41 @@ export const WorkoutView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* 5. MODAL POPUP DEMO VIDEO */}
+      {activeDemo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-[#FF5E00]">
+                <Video className="w-5 h-5" />
+                <h3 className="font-extrabold text-[#111827] text-base">{activeDemo.name}</h3>
+              </div>
+              <button
+                onClick={() => setActiveDemo(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Container Pemutar Video Demo */}
+            <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center relative">
+              <iframe
+                className="w-full h-full"
+                src={activeDemo.videoUrl}
+                title={`Demo ${activeDemo.name}`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+
+            <p className="text-xs text-slate-500 font-medium bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <strong className="text-[#111827]">Tips Eksekusi:</strong> {activeDemo.note}
+            </p>
+          </div>
+        </div>
+      )}
 
     </div>
   );
