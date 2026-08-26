@@ -171,12 +171,10 @@ export const WorkoutView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {mockExercises.map((ex, idx) => (
               <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex gap-4 hover:border-slate-200 transition-colors">
-                {/* Nomor Urut */}
                 <div className="w-10 h-10 shrink-0 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-lg">
                   {idx + 1}
                 </div>
                 
-                {/* Detail Gerakan */}
                 <div className="flex-1 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-extrabold text-[#111827] text-base leading-tight">{ex.name}</h3>
@@ -255,7 +253,6 @@ export const WorkoutView: React.FC = () => {
               </button>
             </div>
 
-            {/* Container Pemutar Video Demo */}
             <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center relative">
               <iframe
                 className="w-full h-full"
@@ -276,3 +273,5 @@ export const WorkoutView: React.FC = () => {
     </div>
   );
 };
+
+export default WorkoutView;
