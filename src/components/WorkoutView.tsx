@@ -1,246 +1,146 @@
 // src/components/WorkoutView.tsx
-import React, { useState } from 'react';
-import { Dumbbell, RotateCcw, Save, CheckCircle2, Video, ChevronDown, Sparkles } from 'lucide-react';
+import React from 'react';
+import { 
+  Dumbbell, 
+  Play, 
+  Info, 
+  Clock, 
+  Flame, 
+  CheckCircle2,
+  Settings2
+} from 'lucide-react';
 
 export const WorkoutView: React.FC = () => {
-  const [selectedWeek, setSelectedWeek] = useState(1);
-  const [selectedDay, setSelectedDay] = useState(1);
+  // DATA DUMMY (Akan digantikan oleh logika WORKOUT_TEMPLATE_LOGIC.md)
+  const mockProgram = {
+    splitName: "Upper Body A",
+    week: 2,
+    experience: "Intermediate",
+    goal: "Hypertrophy",
+    globalReps: "8-12",
+    globalRIR: "1-2"
+  };
 
-  const weeks = [
-    { id: 1, title: 'W1: Pondasi', desc: 'Volume Baseline & Teknik' },
-    { id: 2, title: 'W2: Volume Peak', desc: 'Penambahan Sets (+1 Set)' },
-    { id: 3, title: 'W3: Intensity Peak', desc: 'RIR Dekat Failure (-1 RIR)' },
-    { id: 4, title: 'W4: Deload', desc: 'Pemulihan Sendi (2 Sets)' },
+  const mockExercises = [
+    { name: "Barbell Bench Press", sets: 3, reps: "8-12", rest: "90s", note: "Fokus pada rentang gerak penuh" },
+    { name: "Incline Dumbbell Row", sets: 3, reps: "10-12", rest: "90s", note: "Tahan kontraksi di puncak" },
+    { name: "Overhead Shoulder Press", sets: 3, reps: "10-12", rest: "90s", note: "Jangan melengkungkan punggung" },
   ];
 
-  const days = [
-    { id: 1, label: 'Hari 1 - Push Focus' },
-    { id: 2, label: 'Hari 2 - Pull Focus' },
-    { id: 3, label: 'Hari 3 - Leg Focus' },
-    { id: 4, label: 'Hari 4 - Upper Body' },
-    { id: 5, label: 'Hari 5 - Lower & Core' },
-  ];
-
-  const exercises = [
-    { name: 'Barbell Bench Press', target: 'Chest', type: 'Compound', sets: '3 Sets', reps: '6-10 Reps', rir: 'RIR 1', completed: true },
-    { name: 'Incline Dumbbell Press', target: 'Chest', type: 'Compound', sets: '3 Sets', reps: '6-10 Reps', rir: 'RIR 1', completed: true },
-    { name: 'Standing Overhead Press', target: 'Shoulder', type: 'Compound', sets: '3 Sets', reps: '8-10 Reps', rir: 'RIR 1', completed: false },
-    { name: 'Triceps Rope Pushdown', target: 'Tricep', type: 'Isolation', sets: '3 Sets', reps: '10-12 Reps', rir: 'RIR 0', completed: false },
-    { name: 'Lateral Raise', target: 'Shoulder', type: 'Isolation', sets: '4 Sets', reps: '12-15 Reps', rir: 'RIR 0', completed: false },
-  ];
+  const hasCardioFinisher = true; // Sesuai logika: True jika Fat Loss/General Fitness
 
   return (
-    <div className="pt-0 pb-8 md:pt-6 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
+    // WRAPPER INI SAMA PERSIS DENGAN DASHBOARD AGAR PADDING SERASI
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12 pt-2">
       
-      {/* Active Program Header Banner */}
-      <div className="bg-[#111111] text-white p-6 md:p-8 rounded-2xl border border-[#E2E8F0] shadow-sm relative overflow-hidden">
-        <div className="relative z-10 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FF5E00] text-white rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                <Sparkles className="w-3.5 h-3.5" />
-                Program Aktif Berjalan
+      {/* 1. HEADER WORKOUT */}
+      <div className="bg-[#111827] text-white p-6 sm:p-8 rounded-3xl shadow-sm relative overflow-hidden border border-slate-800">
+        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#FF5E00]/20 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-[#FF5E00]/10 border border-[#FF5E00]/30 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-[#FF5E00] uppercase tracking-wider">
+                Minggu {mockProgram.week}
               </span>
-              <span className="text-[10px] text-[#10B981] font-bold bg-[#10B981]/10 px-2.5 py-1 rounded-full border border-[#10B981]/20 uppercase tracking-wider">
-                ✓ Cloud Sync
+              <span className="bg-slate-800 border border-slate-700 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider">
+                {mockProgram.experience}
               </span>
             </div>
-
-            <button className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-gray-800 hover:bg-gray-800">
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Program</span>
-            </button>
-          </div>
-
-          <div>
-            <h1 className="text-2xl md:text-4xl font-black uppercase tracking-tight">
-              Hypertrophy <span className="text-[#FF5E00]">• Full Gym</span>
+            
+            <h1 className="text-3xl sm:text-4xl font-black leading-tight text-white">
+              {mockProgram.splitName}
             </h1>
-            <p className="text-sm text-gray-400 mt-1 font-medium">Disimpan: 23 Agu 2026</p>
+            
+            <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-400 mt-2">
+              <div className="flex items-center gap-1.5">
+                <Settings2 className="w-4 h-4 text-[#FF5E00]" />
+                <span>Goal: {mockProgram.goal}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-emerald-400" />
+                <span>Target: {mockProgram.globalReps} Reps | {mockProgram.globalRIR} RIR</span>
+              </div>
+            </div>
           </div>
 
-          {/* Progress Bar Solid (Tanpa Gradasi) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-gray-300">Hari Ini (W1 - Hari 1)</span>
-                <span className="text-[#FF5E00] font-mono">40%</span>
-              </div>
-              <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-[#FF5E00] h-full w-[40%] rounded-full transition-all duration-500" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-gray-300">Total Siklus 4 Minggu</span>
-                <span className="text-gray-400 font-mono">5%</span>
-              </div>
-              <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-[#CACACB] h-full w-[5%] rounded-full transition-all duration-500" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Program Configurator Card */}
-      <div className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#F5F5F5] pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-[#F5F5F5] rounded-xl">
-              <Dumbbell className="w-5 h-5 text-[#111111]" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base text-[#111111]">Konfigurator Latihan</h3>
-              <p className="text-xs font-medium text-[#64748B]">Sesuaikan parameter dengan target Anda</p>
-            </div>
-          </div>
-          {/* Tombol Solid (Tanpa Gradasi) */}
-          <button className="px-6 py-2.5 bg-[#FF5E00] hover:bg-[#E05300] text-white rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-2 transition-all shadow-sm">
-            <Save className="w-4 h-4" />
-            <span>Simpan Program Ini</span>
+          <button className="w-full md:w-auto bg-[#FF5E00] hover:bg-[#E05300] text-white py-3.5 px-8 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-sm shrink-0">
+            <Play className="w-5 h-5 fill-current" />
+            <span>Mulai Latihan</span>
           </button>
         </div>
-
-        {/* Form Selects */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {[
-            { label: 'FITNESS GOAL', options: ['Hypertrophy (Muscular)', 'Strength Focus', 'Fat Loss'] },
-            { label: 'PERALATAN', options: ['Full Gym Equipment', 'Dumbbell Only', 'Bodyweight'] },
-            { label: 'EXPERIENCE LEVEL', options: ['Advanced', 'Intermediate', 'Beginner'] },
-            { label: 'HARI / MINGGU', options: ['5 Hari / Minggu', '4 Hari / Minggu', '3 Hari / Minggu'] },
-            { label: 'DURASI / SESI', options: ['75+ Menit (5 Gerakan)', '60 Menit (4 Gerakan)', '45 Menit (3 Gerakan)'] },
-          ].map((field, idx) => (
-            <div key={idx} className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B]">
-                {field.label}
-              </label>
-              <div className="relative">
-                <select className="w-full bg-[#F5F5F5] border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-xs font-bold text-[#111111] appearance-none focus:outline-none focus:border-[#FF5E00] cursor-pointer pr-8">
-                  {field.options.map((opt, oIdx) => (
-                    <option key={oIdx}>{opt}</option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-[#94A3B8] absolute right-3 top-3 pointer-events-none" />
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* Siklus Progresi Mingguan Tabs */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-[#64748B]">
-          Siklus Progresi Mingguan
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {weeks.map((w) => (
-            <button
-              key={w.id}
-              onClick={() => setSelectedWeek(w.id)}
-              className={`p-4 rounded-2xl text-left border transition-all ${
-                selectedWeek === w.id
-                  ? 'bg-[#111111] border-[#111111] text-white shadow-sm'
-                  : 'bg-[#FFFFFF] border-[#E2E8F0] text-[#111111] hover:bg-[#F5F5F5]'
-              }`}
-            >
-              <p className="font-bold text-[13px]">{w.title}</p>
-              <p className={`text-[11px] mt-0.5 font-medium ${selectedWeek === w.id ? 'text-gray-400' : 'text-[#64748B]'}`}>
-                {w.desc}
-              </p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Pembagian Jadwal Split Harian */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-[#64748B]">
-          Pembagian Jadwal Split Harian
-        </h3>
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {days.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setSelectedDay(d.id)}
-              className={`px-5 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-all border ${
-                selectedDay === d.id
-                  ? 'bg-[#111111] text-white border-[#111111]'
-                  : 'bg-[#FFFFFF] text-[#64748B] border-[#E2E8F0] hover:bg-[#F5F5F5] hover:text-[#111111]'
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Menu Latihan (Exercise Cards) */}
+      {/* 2. DAFTAR GERAKAN (EXERCISES) */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-base text-[#111111] uppercase tracking-tight">
-              HARI {selectedDay} - PUSH FOCUS
-            </h3>
-            <p className="text-xs font-medium text-[#64748B]">Target: Chest, Shoulder, Tricep</p>
-          </div>
-          <span className="text-[10px] font-bold text-[#111111] bg-[#F5F5F5] px-3 py-1.5 rounded-full border border-[#E2E8F0] uppercase tracking-wider">
-            5 GERAKAN
-          </span>
+        <div className="flex items-center justify-between px-2">
+          <h2 className="text-lg font-extrabold text-[#111827] flex items-center gap-2">
+            <Dumbbell className="w-5 h-5 text-[#FF5E00]" />
+            Gerakan Utama
+          </h2>
+          <span className="text-xs font-bold text-slate-400">{mockExercises.length} Latihan</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {exercises.map((item, idx) => (
-            <div
-              key={idx}
-              className={`bg-[#FFFFFF] p-5 rounded-2xl border transition-all ${
-                item.completed
-                  ? 'border-[#10B981] bg-[#10B981]/5'
-                  : 'border-[#E2E8F0] shadow-sm'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-full flex items-center justify-center ${
-                      item.completed ? 'bg-[#10B981] text-white' : 'bg-[#F5F5F5] text-[#CACACB]'
-                    }`}
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#FF5E00]/10 text-[#FF5E00]">
-                        {item.target}
-                      </span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F5F5F5] text-[#64748B]">
-                        {item.type}
-                      </span>
-                    </div>
-                    <h4 className="font-bold text-[15px] text-[#111111]">{item.name}</h4>
-                  </div>
+          {mockExercises.map((ex, idx) => (
+            <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex gap-4 hover:border-slate-200 transition-colors">
+              {/* Nomor Urut */}
+              <div className="w-10 h-10 shrink-0 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-lg">
+                {idx + 1}
+              </div>
+              
+              {/* Detail Gerakan */}
+              <div className="flex-1 space-y-2">
+                <h3 className="font-extrabold text-[#111827] text-base leading-tight">{ex.name}</h3>
+                
+                <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                  <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-100">
+                    {ex.sets} Sets
+                  </span>
+                  <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md border border-emerald-100">
+                    {ex.reps} Reps
+                  </span>
+                  <span className="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-md border border-slate-200 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {ex.rest}
+                  </span>
                 </div>
 
-                <button className="text-[#64748B] hover:text-[#111111] p-1.5 rounded-lg hover:bg-[#F5F5F5] transition-colors flex items-center gap-1.5 text-xs font-bold">
-                  <Video className="w-4 h-4" />
-                  <span className="hidden sm:inline">Demo</span>
-                </button>
-              </div>
-
-              {/* Metrics */}
-              <div className="flex items-center justify-between pt-3 border-t border-[#F5F5F5] text-[13px] font-bold font-mono">
-                <span className="text-[#111111]">{item.sets}</span>
-                <span className="text-[#CACACB]">•</span>
-                <span className="text-[#111111]">{item.reps}</span>
-                <span className="text-[#CACACB]">•</span>
-                <span className="text-[#FF5E00] bg-[#FF5E00]/10 px-2 py-0.5 rounded-md text-xs">{item.rir}</span>
+                <p className="text-[11px] font-medium text-slate-500 flex items-start gap-1.5 pt-1">
+                  <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                  {ex.note}
+                </p>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* 3. CARDIO FINISHER (Kondisional berdasarkan Goal) */}
+      {hasCardioFinisher && (
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden mt-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-[#FF5E00] flex items-center justify-center shrink-0">
+                <Flame className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-[#111827] text-base flex items-center gap-2">
+                  Cardio Finisher
+                  <span className="bg-[#111827] text-white text-[9px] uppercase px-2 py-0.5 rounded-md">Khusus Fat Loss</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-1">
+                  HIIT / LISS 15-20 Menit untuk memaksimalkan pembakaran kalori.
+                </p>
+              </div>
+            </div>
+            
+            <button className="w-full sm:w-auto bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2.5 px-5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm">
+              <CheckCircle2 className="w-4 h-4" /> Tandai Selesai
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
-
-export default WorkoutView;
