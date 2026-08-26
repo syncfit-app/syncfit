@@ -15,7 +15,7 @@ export const NutritionView: React.FC = () => {
     <div className="pt-0 pb-8 md:pt-6 md:pb-12 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
       {/* Header Summary Nutrisi */}
       <div className="bg-white p-6 rounded-2xl border border-[#F1F5F9] shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
           <div className="w-16 h-16 bg-[#FF5E00]/10 rounded-2xl flex items-center justify-center text-[#FF5E00] shrink-0">
             <Utensils className="w-8 h-8" />
           </div>
@@ -25,32 +25,32 @@ export const NutritionView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-6 text-center">
+        <div className="flex items-center justify-center gap-4 md:gap-6 text-center w-full md:w-auto">
           <div>
-            <p className="text-2xl font-black text-[#111827]">1,650</p>
-            <p className="text-[11px] font-semibold text-[#64748B] uppercase">Dikonsumsi</p>
+            <p className="text-xl md:text-2xl font-black text-[#111827]">1,650</p>
+            <p className="text-[10px] md:text-[11px] font-semibold text-[#64748B] uppercase">Dikonsumsi</p>
           </div>
           <div className="h-8 w-[1px] bg-[#E2E8F0]" />
           <div>
-            <p className="text-2xl font-black text-[#FF5E00]">2,100</p>
-            <p className="text-[11px] font-semibold text-[#64748B] uppercase">Target (kcal)</p>
+            <p className="text-xl md:text-2xl font-black text-[#FF5E00]">2,100</p>
+            <p className="text-[10px] md:text-[11px] font-semibold text-[#64748B] uppercase">Target</p>
           </div>
           <div className="h-8 w-[1px] bg-[#E2E8F0]" />
           <div>
-            <p className="text-2xl font-black text-green-600">450</p>
-            <p className="text-[11px] font-semibold text-[#64748B] uppercase">Sisa</p>
+            <p className="text-xl md:text-2xl font-black text-green-600">450</p>
+            <p className="text-[10px] md:text-[11px] font-semibold text-[#64748B] uppercase">Sisa</p>
           </div>
         </div>
       </div>
 
       {/* Log Makanan Harian */}
       <div className="bg-white p-6 rounded-2xl border border-[#F1F5F9] shadow-sm">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h3 className="font-bold text-base text-[#111827]">Log Makanan Hari Ini</h3>
           
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-[#111111] hover:bg-[#222222] text-white rounded-full text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+            className="w-full sm:w-auto px-4 py-2.5 bg-[#111111] hover:bg-[#222222] text-white rounded-full text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Tambah Makanan</span>
@@ -61,16 +61,19 @@ export const NutritionView: React.FC = () => {
           {meals.map((meal, idx) => {
             const Icon = meal.icon;
             return (
-              <div key={idx} className="flex items-center justify-between p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]/50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-white rounded-lg text-[#111827] shadow-sm border border-[#E2E8F0]">
+              <div key={idx} className="flex items-center justify-between gap-3 p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]/50">
+                {/* Bagian Kiri: min-w-0 dan flex-1 sangat penting agar teks bisa di-truncate pada layar kecil */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="p-2.5 bg-white rounded-lg text-[#111827] shadow-sm border border-[#E2E8F0] shrink-0">
                     <Icon className="w-5 h-5 text-[#FF5E00]" />
                   </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-[#111827]">{meal.title}</h4>
-                    <p className="text-xs font-medium text-[#64748B] max-w-[200px] sm:max-w-md truncate">{meal.desc}</p>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-sm text-[#111827] truncate">{meal.title}</h4>
+                    <p className="text-xs font-medium text-[#64748B] truncate">{meal.desc}</p>
                   </div>
                 </div>
+                
+                {/* Bagian Kanan */}
                 <div className="text-right shrink-0">
                   <span className="font-bold text-sm text-[#111827]">{meal.kcal} kcal</span>
                   <p className="text-[10px] font-medium text-[#94A3B8]">{meal.time}</p>
