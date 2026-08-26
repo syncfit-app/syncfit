@@ -39,7 +39,7 @@ export const DashboardView: React.FC = () => {
     Math.min((current / target) * 100, 100);
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12 pt-2">
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-8 pt-2">
       
       {/* GRID UTAMA (RESPONSIF: Mobile 1 Kolom, Desktop 3 Kolom) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
