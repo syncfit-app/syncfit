@@ -30,7 +30,7 @@ export const WorkoutView: React.FC = () => {
   ];
 
   return (
-    <div className="pt-0 pb-8 md:pt-6 md:pb-12 px-4 md:px-8 max-w-6xl mx-auto space-y-6">
+    <div className="pt-0 pb-8 md:pt-6 md:pb-12 px-4 md:px-7 max-w-6xl mx-auto space-y-6">
       
       {/* Active Program Header Banner */}
       <div className="bg-[#111111] text-white p-6 md:p-8 rounded-2xl border border-[#E2E8F0] shadow-sm relative overflow-hidden">
