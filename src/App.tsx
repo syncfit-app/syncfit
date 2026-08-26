@@ -23,7 +23,6 @@ export function App() {
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
-  // Ambil profil secara terpisah tanpa memblokir UI utama
   const fetchProfile = async (userId: string) => {
     try {
       const { data } = await supabase
@@ -45,15 +44,19 @@ export function App() {
   };
 
   useEffect(() => {
-    // Listener tunggal Supabase (otomatis mengecek sesi awal & perubahan auth)
+    // 1. Cek sesi secara eksplisit saat aplikasi pertama kali dimuat
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+      if (session) fetchProfile(session.user.id);
+    });
+
+    // 2. Dengarkan perubahan login/logout selanjutnya
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      
-      // PASTI MATIKAN LOADING SEGERA setelah status sesi diketahui
-      setAuthLoading(false);
+      setAuthLoading(false); // Selalu pastikan loading mati jika ada perubahan status
 
       if (session) {
-        // Jalankan pencarian profil di latar belakang (non-blocking)
         fetchProfile(session.user.id);
       } else {
         setHasProfile(null);
@@ -69,7 +72,6 @@ export function App() {
     await supabase.auth.signOut();
   };
 
-  // 1. Loading State HANYA saat mengecek otentikasi awal
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center gap-3">
@@ -79,17 +81,15 @@ export function App() {
     );
   }
 
-  // 2. Jika belum login
+  // PERUBAHAN DI SINI: Hapus properti onLogin agar tidak bentrok dengan Supabase
   if (!session) {
-    return <LoginView onLogin={() => setAuthLoading(true)} />;
+    return <LoginView />;
   }
 
-  // 3. Jika login tapi dipastikan belum isi onboarding
   if (hasProfile === false) {
     return <OnboardingView onComplete={() => fetchProfile(session.user.id)} />;
   }
 
-  // 4. Tampilan Utama Dashboard (Langsung terbuka instan)
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-24 md:pb-12 pt-16 md:pt-20">
       <Header profile={profile} onLogout={handleLogout} />
