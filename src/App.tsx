@@ -14,55 +14,47 @@ import { NutritionView } from './components/NutritionView';
 import { ProgressView } from './components/ProgressView';
 import { LoginView } from './components/LoginView';
 import { OnboardingView } from './components/OnboardingView';
-import { ProfileView } from './components/ProfileView'; // Pastikan import ini ada
+import { ProfileView } from './components/ProfileView';
 import { Loader2 } from 'lucide-react';
 
 export function App() {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
-  
-  // Ubah nama state agar spesifik hanya untuk Auth
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
+  // Ambil profil secara terpisah tanpa memblokir UI utama
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (data) {
-      setProfile(data);
-      setHasProfile(true);
-    } else {
+      if (data) {
+        setProfile(data);
+        setHasProfile(true);
+      } else {
+        setHasProfile(false);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil profil:", error);
       setHasProfile(false);
     }
   };
 
   useEffect(() => {
-    const checkSessionAndProfile = async () => {
-      // 1. Cek sesi login (Sangat cepat karena dari local storage/browser)
-      const { data: { session } } = await supabase.auth.getSession();
+    // Listener tunggal Supabase (otomatis mengecek sesi awal & perubahan auth)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       
-      // 2. LANGSUNG UNBLOCK UI agar Dashboard bisa langsung render
-      setAuthLoading(false); 
-      
-      // 3. Ambil data profil di background (Lambat karena ke database)
-      if (session) {
-        await fetchProfile(session.user.id);
-      } else {
-        setHasProfile(null);
-      }
-    };
+      // PASTI MATIKAN LOADING SEGERA setelah status sesi diketahui
+      setAuthLoading(false);
 
-    checkSessionAndProfile();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
       if (session) {
-        await fetchProfile(session.user.id);
+        // Jalankan pencarian profil di latar belakang (non-blocking)
+        fetchProfile(session.user.id);
       } else {
         setHasProfile(null);
         setProfile(null);
@@ -73,10 +65,11 @@ export function App() {
   }, []);
 
   const handleLogout = async () => {
+    setAuthLoading(true);
     await supabase.auth.signOut();
   };
 
-  // 1. Loading State HANYA untuk Otentikasi (Sangat Singkat)
+  // 1. Loading State HANYA saat mengecek otentikasi awal
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center gap-3">
@@ -96,10 +89,9 @@ export function App() {
     return <OnboardingView onComplete={() => fetchProfile(session.user.id)} />;
   }
 
-  // 4. Tampilan Utama (Langsung terbuka, data profil menyusul di background)
+  // 4. Tampilan Utama Dashboard (Langsung terbuka instan)
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-[#111111] font-sans pb-24 md:pb-12 pt-16 md:pt-20">
-      {/* Jika profile belum ter-load, Header akan pakai fallback "Warrior" */}
       <Header profile={profile} onLogout={handleLogout} />
 
       <main className="max-w-6xl mx-auto px-4 pt-6">
