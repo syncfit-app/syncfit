@@ -4,11 +4,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
+import { DashboardView } from './components/DashboardView';
 import { WorkoutView } from './components/WorkoutView';
-import { MetricsGrid } from './components/MetricsGrid';
-import { HeroBanner } from './components/HeroBanner';
-import { DailyChallengeCard } from './components/DailyChallengeCard';
-import { NutritionSummaryCard } from './components/NutritionSummaryCard';
 import { GPSView } from './components/GPSView';
 import { NutritionView } from './components/NutritionView';
 import { ProgressView } from './components/ProgressView';
@@ -81,7 +78,7 @@ export function App() {
     );
   }
 
-  // PERUBAHAN DI SINI: Hapus properti onLogin agar tidak bentrok dengan Supabase
+  // Hapus properti onLogin agar tidak bentrok dengan Supabase
   if (!session) {
     return <LoginView />;
   }
@@ -96,21 +93,8 @@ export function App() {
 
       <main className="max-w-6xl mx-auto px-4 pt-6">
         <Routes>
-          <Route
-            path="/"
-            element={
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-8">
-                <div className="lg:col-span-2 space-y-6">
-                  <HeroBanner />
-                  <MetricsGrid />
-                </div>
-                <div className="space-y-6">
-                  <DailyChallengeCard />
-                  <NutritionSummaryCard />
-                </div>
-              </div>
-            }
-          />
+          {/* PERUBAHAN DI SINI: Route utama sekarang langsung memanggil DashboardView yang sudah rapi */}
+          <Route path="/" element={<DashboardView />} />
           <Route path="/workout" element={<WorkoutView />} />
           <Route path="/gps" element={<GPSView />} />
           <Route path="/nutrition" element={<NutritionView />} />
