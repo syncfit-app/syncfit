@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
-  Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download
+  Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download, ArrowRight
 } from 'lucide-react';
 
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
@@ -60,11 +60,21 @@ export const WorkoutView: React.FC = () => {
     return () => clearInterval(interval);
   }, [isWorkoutActive]);
 
+  // Handler Generate Program dari Modal (Awal Config)
   const handleGeneratePlan = () => {
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal, selectedWeek);
     setActivePlan(newPlan);
     setCompletedExercises({}); 
     setIsConfigModalOpen(false);
+    setSelectedDay(0);
+  };
+
+  // Handler Ganti Minggu Periodisasi (Langsung Ubah Data Sets/Reps)
+  const handleWeekChange = (week: number) => {
+    setSelectedWeek(week);
+    const newPlan = generateWorkoutPlan(formExp, formDays, formGoal, week);
+    setActivePlan(newPlan);
+    setCompletedExercises({}); // Reset log saat ganti minggu
     setSelectedDay(0);
   };
 
@@ -100,7 +110,6 @@ export const WorkoutView: React.FC = () => {
     setTimer(0);
   };
 
-  // HANDLER DOWNLOAD STRAVA STICKER TRANSPARENT
   const downloadRecapPNG = async () => {
     const element = document.getElementById('strava-sticker-card');
     if (!element) return;
@@ -222,6 +231,39 @@ export const WorkoutView: React.FC = () => {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* CARD PERIODISASI MINGGUAN (Pindah kesini) */}
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
+                <Zap className="w-4 h-4 text-[#FF5E00]" />
+                Fase Periodisasi
+              </h3>
+              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                Pilih Minggu <ArrowRight className="w-3 h-3" />
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { w: 1, label: 'W1: Pondasi' },
+                { w: 2, label: 'W2: Volume' },
+                { w: 3, label: 'W3: Intensitas' },
+                { w: 4, label: 'W4: Deload' }
+              ].map((item) => (
+                <button
+                  key={item.w}
+                  onClick={() => handleWeekChange(item.w)}
+                  className={`py-3 px-2 text-[11px] sm:text-xs font-black rounded-xl border transition-all duration-300 ${
+                    selectedWeek === item.w
+                      ? 'bg-[#FF5E00] text-white border-[#FF5E00] shadow-md shadow-orange-500/20 scale-[1.02]'
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -416,32 +458,32 @@ export const WorkoutView: React.FC = () => {
               </span>
             </div>
 
-            {/* 4. List Gerakan Diselesaikan */}
+            {/* 4. List Gerakan Diselesaikan (Rata Kiri, Tengah) */}
             {completedExercises[selectedDay] && completedExercises[selectedDay].length > 0 && (
-              <div className="w-full space-y-1.5 mb-8 border-t border-b border-white/20 py-3">
-                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-2" style={textShadowStyle}>
+              <div className="w-full flex flex-col items-center mb-6">
+                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-3" style={textShadowStyle}>
                   Exercises Completed
                 </span>
-                {completedExercises[selectedDay].map(idx => (
-                  <div key={idx} className="flex items-center justify-center gap-2 text-xs font-extrabold text-white">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#FF5E00] shrink-0" style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.8))' }} />
-                    <span style={textShadowStyle}>{activeWorkout?.exercises[idx].name}</span>
-                  </div>
-                ))}
+                <div className="flex flex-col items-start gap-1.5">
+                  {completedExercises[selectedDay].map(idx => (
+                    <div key={idx} className="flex items-center gap-2 text-sm font-bold text-white">
+                      <CheckCircle2 className="w-4 h-4 text-[#FF5E00] shrink-0" style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.8))' }} />
+                      <span style={textShadowStyle}>{activeWorkout?.exercises[idx].name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* 5. Ikon Dumbbell Orange Besar (Persis Sepatu Strava) */}
+            {/* 5. Ikon Dumbbell Orange Besar */}
             <div className="my-2">
               <Dumbbell className="w-16 h-16 text-[#FF5E00] stroke-[2.2]" style={{ filter: 'drop-shadow(0px 4px 12px rgba(0,0,0,0.9))' }} />
             </div>
 
-            {/* 6. Logo Header SYNCFIT Eksak */}
+            {/* 6. Logo Header SYNCFIT Real Image */}
             <div className="flex items-center justify-center gap-2 mt-4">
-              <div className="bg-[#FF5E00] text-white w-7 h-7 rounded-[8px] flex items-center justify-center font-black italic text-lg tracking-tighter shadow-md">
-                F
-              </div>
-              <span className="font-black text-xl italic tracking-wider text-white" style={textShadowStyle}>
+              <img src="/logo.png" alt="SyncFit Logo" className="w-8 h-8 object-contain drop-shadow-md" />
+              <span className="font-black text-2xl italic tracking-wider text-white" style={textShadowStyle}>
                 SYNC<span className="text-[#FF5E00]">FIT</span>
               </span>
             </div>
@@ -466,7 +508,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL KONFIGURASI PROGRAM DENGAN MINGGU PERIODISASI */}
+      {/* MODAL KONFIGURASI PROGRAM */}
       {isConfigModalOpen && (
         <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
@@ -481,26 +523,6 @@ export const WorkoutView: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Minggu Periodisasi</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { w: 1, label: 'W1: Pondasi' },
-                    { w: 2, label: 'W2: Volume' },
-                    { w: 3, label: 'W3: Intensitas' },
-                    { w: 4, label: 'W4: Deload' }
-                  ].map((item) => (
-                    <button 
-                      key={item.w} 
-                      onClick={() => setSelectedWeek(item.w)} 
-                      className={`py-2 px-1 text-[11px] font-bold rounded-xl border transition-all ${selectedWeek === item.w ? 'bg-[#FF5E00] text-white border-[#FF5E00] shadow-md' : 'bg-white text-slate-500 border-slate-200'}`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Pengalaman</label>
                 <div className="grid grid-cols-3 gap-2">
