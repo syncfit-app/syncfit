@@ -34,13 +34,13 @@ export const generateWorkoutPlan = (
   
   if (exp === 'Pemula') {
     baseSets = 2;
-    maxExercises = 6; // Pemula dibatasi 6 gerakan per sesi
+    maxExercises = 6;
   } else if (exp === 'Mahir') {
     baseSets = 4;
     maxExercises = 7;
   } else {
     baseSets = 3;
-    maxExercises = 7; // Menengah dapat 7 gerakan
+    maxExercises = 7;
   }
 
   // 2. FAKTOR PERIODISASI MINGGUAN (Set Multiplier)
@@ -89,41 +89,41 @@ export const generateWorkoutPlan = (
     videoUrl
   });
 
-  // 4. DATABASE GERAKAN LENGKAP
+  // 4. DATABASE GERAKAN LENGKAP (Video Demo Pendek & Langsung Praktek)
   const db = {
     // PUSH (Chest, Shoulders, Triceps)
-    bench: ex('Barbell Bench Press', 'Turunkan beban terkontrol sampai dada.', 'https://www.youtube.com/embed/rT7DgCr-3pg'),
-    incPress: ex('Incline DB Press', 'Atur sudut bench 30 derajat fokus dada atas.', 'https://www.youtube.com/embed/8iPEnnVgtCU'),
-    cableCross: ex('Cable Crossover', 'Fokus pada kontraksi dada saat di tengah.', 'https://www.youtube.com/embed/taI4XduLpTk'),
-    pecDeck: ex('Pec Deck Fly', 'Busungkan dada, peras otot dada di puncak gerakan.', 'https://www.youtube.com/embed/O-j40O0O_60'),
-    ohp: ex('Overhead Press', 'Kencangkan core saat mendorong ke atas.', 'https://www.youtube.com/embed/2yjwXT8jVI0'),
-    latRaise: ex('Dumbbell Lateral Raise', 'Siku sedikit ditekuk, rasakan bahu samping.', 'https://www.youtube.com/embed/3VcKaXpzqRo'),
-    tricepPush: ex('Tricep Pushdown', 'Kunci siku di samping badan.', 'https://www.youtube.com/embed/2-LAMcpzODU'),
-    ohTricep: ex('Overhead Tricep Ext', 'Fokus pada rentang gerak penuh tricep.', 'https://www.youtube.com/embed/nRiJVZDpdL0'),
+    bench: ex('Barbell Bench Press', 'Turunkan beban terkontrol sampai dada.', 'https://www.youtube.com/embed/rxD321l2svE'),
+    incPress: ex('Incline DB Press', 'Atur sudut bench 30 derajat fokus dada atas.', 'https://www.youtube.com/embed/0GZcgOvU2yY'),
+    cableCross: ex('Cable Crossover', 'Fokus pada kontraksi dada saat di tengah.', 'https://www.youtube.com/embed/Iwe6AmxVf7o'),
+    pecDeck: ex('Pec Deck Fly', 'Busungkan dada, peras otot dada di puncak gerakan.', 'https://www.youtube.com/embed/eGjt4joGQRE'),
+    ohp: ex('Overhead Press', 'Kencangkan core saat mendorong ke atas.', 'https://www.youtube.com/embed/QAQ64BKYg1A'),
+    latRaise: ex('Dumbbell Lateral Raise', 'Siku sedikit ditekuk, rasakan bahu samping.', 'https://www.youtube.com/embed/WJm9OqMtlO8'),
+    tricepPush: ex('Tricep Pushdown', 'Kunci siku di samping badan.', 'https://www.youtube.com/embed/lxUaDkeU6FA'),
+    ohTricep: ex('Overhead Tricep Ext', 'Fokus pada rentang gerak penuh tricep.', 'https://www.youtube.com/embed/_gsNqT0G87o'),
     
     // PULL (Back, Rear Delts, Biceps, Traps)
-    pullup: ex('Pull Up / Assisted', 'Tarik dada mendekati bar.', 'https://www.youtube.com/embed/eGo4IYlbE5g'),
-    latPull: ex('Lat Pulldown', 'Tarik beban menggunakan otot punggung (lats).', 'https://www.youtube.com/embed/CAwf7n6Luuc'),
-    bbRow: ex('Barbell Row', 'Tarik siku ke arah pinggul.', 'https://www.youtube.com/embed/G8l_8chR5BE'),
-    dbRow: ex('Single-arm DB Row', 'Jaga punggung rata, tarik beban ke arah pinggang.', 'https://www.youtube.com/embed/pYcpY20QaE8'),
-    facePull: ex('Face Pulls', 'Tarik tali ke arah dahi, buka siku keluar.', 'https://www.youtube.com/embed/0QsCEkesFzY'),
-    shrug: ex('Dumbbell Shrug', 'Angkat bahu ke arah telinga, tahan sejenak lalu turun perlahan.', 'https://www.youtube.com/embed/g6qbq4Lf1FI'),
-    bicepCurl: ex('Barbell Bicep Curl', 'Isolasi bicep tanpa mengayunkan punggung.', 'https://www.youtube.com/embed/kwG2ipFRgfo'),
-    hammerCurl: ex('DB Hammer Curl', 'Genggaman netral untuk brachialis yang tebal.', 'https://www.youtube.com/embed/zC3nLlEvin4'),
+    pullup: ex('Pull Up / Assisted', 'Tarik dada mendekati bar.', 'https://www.youtube.com/embed/i5g-vwNeJEY'),
+    latPull: ex('Lat Pulldown', 'Tarik beban menggunakan otot punggung (lats).', 'https://www.youtube.com/embed/EUIrlJRqRng'),
+    bbRow: ex('Barbell Row', 'Tarik siku ke arah pinggul.', 'https://www.youtube.com/embed/axoeDmC0pXQ'),
+    dbRow: ex('Single-arm DB Row', 'Jaga punggung rata, tarik beban ke arah pinggang.', 'https://www.youtube.com/embed/dFzNQbqxUfI'),
+    facePull: ex('Face Pulls', 'Tarik tali ke arah dahi, buka siku keluar.', 'https://www.youtube.com/embed/V8GlYWRoceA'),
+    shrug: ex('Dumbbell Shrug', 'Angkat bahu ke arah telinga, tahan sejenak lalu turun perlahan.', 'https://www.youtube.com/embed/M5G67iXUaEE'),
+    bicepCurl: ex('Barbell Bicep Curl', 'Isolasi bicep tanpa mengayunkan punggung.', 'https://www.youtube.com/embed/ykJmrZ5v0Oo'),
+    hammerCurl: ex('DB Hammer Curl', 'Genggaman netral untuk brachialis yang tebal.', 'https://www.youtube.com/embed/CFBZ4jN1CMI'),
 
     // LEGS (Quads, Hamstrings, Glutes, Calves)
-    squat: ex('Barbell Back Squat', 'Jaga dada tegak dan lutut sejajar jari kaki.', 'https://www.youtube.com/embed/gcNh17Ckjgg'),
-    rdl: ex('Romanian Deadlift', 'Dorong pinggul ke belakang, rasakan stretch di paha belakang.', 'https://www.youtube.com/embed/JCXUYuzwNrM'),
-    legPress: ex('Leg Press', 'Jangan lock lutut secara mendadak saat di atas.', 'https://www.youtube.com/embed/IZxyjW7MPJQ'),
-    bulgarian: ex('Bulgarian Split Squat', 'Fokus pada kaki depan untuk mendorong.', 'https://www.youtube.com/embed/2C-uNgKwPLE'),
-    legExt: ex('Leg Extension', 'Tahan 1 detik di posisi puncak untuk kontraksi paha depan.', 'https://www.youtube.com/embed/YyvSfVjQeL0'),
-    legCurl: ex('Leg Curl', 'Fokus menekuk lutut menggunakan otot hamstring.', 'https://www.youtube.com/embed/F488k67BTNo'),
-    hipThrust: ex('Barbell Hip Thrust', 'Peras otot glutes di puncak gerakan.', 'https://www.youtube.com/embed/xMaeGQEAaw0'),
-    calfRaise: ex('Standing Calf Raise', 'Naik hingga menjinjit maksimal, turun perlahan.', 'https://www.youtube.com/embed/-M4-G8p8fmc'),
+    squat: ex('Barbell Back Squat', 'Jaga dada tegak dan lutut sejajar jari kaki.', 'https://www.youtube.com/embed/bEv6CCg2BC8'),
+    rdl: ex('Romanian Deadlift', 'Dorong pinggul ke belakang, rasakan stretch di paha belakang.', 'https://www.youtube.com/embed/_oyxCn2iSjU'),
+    legPress: ex('Leg Press', 'Jangan lock lutut secara mendadak saat di atas.', 'https://www.youtube.com/embed/GvRgZQl2Zyg'),
+    bulgarian: ex('Bulgarian Split Squat', 'Fokus pada kaki depan untuk mendorong.', 'https://www.youtube.com/embed/Yq7E3O8w8iE'),
+    legExt: ex('Leg Extension', 'Tahan 1 detik di posisi puncak untuk kontraksi paha depan.', 'https://www.youtube.com/embed/m0FOpMEgero'),
+    legCurl: ex('Leg Curl', 'Fokus menekuk lutut menggunakan otot hamstring.', 'https://www.youtube.com/embed/AwzcwOAWbrM'),
+    hipThrust: ex('Barbell Hip Thrust', 'Peras otot glutes di puncak gerakan.', 'https://www.youtube.com/embed/LM8XHLYJoYs'),
+    calfRaise: ex('Standing Calf Raise', 'Naik hingga menjinjit maksimal, turun perlahan.', 'https://www.youtube.com/embed/gwLzCAfwzcw'),
 
     // CORE (Hanya untuk Leg Day / Full Body)
-    cableCrunch: ex('Cable Crunch', 'Lengkungkan punggung, fokus kontraksi perut.', 'https://www.youtube.com/embed/htG-a8T9aVw'),
-    legRaise: ex('Hanging Leg Raise', 'Gunakan otot perut bawah untuk mengangkat kaki.', 'https://www.youtube.com/embed/Pr1ieGZ5atk')
+    cableCrunch: ex('Cable Crunch', 'Lengkungkan punggung, fokus kontraksi perut.', 'https://www.youtube.com/embed/6B9s6-R-x6A'),
+    legRaise: ex('Hanging Leg Raise', 'Gunakan otot perut bawah untuk mengangkat kaki.', 'https://www.youtube.com/embed/hdJ4x0hL9E4')
   };
 
   // Helper Pembuat Sesi Latihan (Filter max exercises berdasarkan Level)
