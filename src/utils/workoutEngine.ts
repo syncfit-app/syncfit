@@ -89,23 +89,25 @@ export const generateWorkoutPlan = (
     videoUrl
   });
 
-  // 4. DATABASE GERAKAN LENGKAP (Modern Gym DB)
+  // 4. DATABASE GERAKAN LENGKAP
   const db = {
     // PUSH (Chest, Shoulders, Triceps)
     bench: ex('Barbell Bench Press', 'Turunkan beban terkontrol sampai dada.', 'https://www.youtube.com/embed/rT7DgCr-3pg'),
     incPress: ex('Incline DB Press', 'Atur sudut bench 30 derajat fokus dada atas.', 'https://www.youtube.com/embed/8iPEnnVgtCU'),
     cableCross: ex('Cable Crossover', 'Fokus pada kontraksi dada saat di tengah.', 'https://www.youtube.com/embed/taI4XduLpTk'),
+    pecDeck: ex('Pec Deck Fly', 'Busungkan dada, peras otot dada di puncak gerakan.', 'https://www.youtube.com/embed/O-j40O0O_60'),
     ohp: ex('Overhead Press', 'Kencangkan core saat mendorong ke atas.', 'https://www.youtube.com/embed/2yjwXT8jVI0'),
     latRaise: ex('Dumbbell Lateral Raise', 'Siku sedikit ditekuk, rasakan bahu samping.', 'https://www.youtube.com/embed/3VcKaXpzqRo'),
     tricepPush: ex('Tricep Pushdown', 'Kunci siku di samping badan.', 'https://www.youtube.com/embed/2-LAMcpzODU'),
     ohTricep: ex('Overhead Tricep Ext', 'Fokus pada rentang gerak penuh tricep.', 'https://www.youtube.com/embed/nRiJVZDpdL0'),
     
-    // PULL (Back, Rear Delts, Biceps)
+    // PULL (Back, Rear Delts, Biceps, Traps)
     pullup: ex('Pull Up / Assisted', 'Tarik dada mendekati bar.', 'https://www.youtube.com/embed/eGo4IYlbE5g'),
     latPull: ex('Lat Pulldown', 'Tarik beban menggunakan otot punggung (lats).', 'https://www.youtube.com/embed/CAwf7n6Luuc'),
     bbRow: ex('Barbell Row', 'Tarik siku ke arah pinggul.', 'https://www.youtube.com/embed/G8l_8chR5BE'),
     dbRow: ex('Single-arm DB Row', 'Jaga punggung rata, tarik beban ke arah pinggang.', 'https://www.youtube.com/embed/pYcpY20QaE8'),
     facePull: ex('Face Pulls', 'Tarik tali ke arah dahi, buka siku keluar.', 'https://www.youtube.com/embed/0QsCEkesFzY'),
+    shrug: ex('Dumbbell Shrug', 'Angkat bahu ke arah telinga, tahan sejenak lalu turun perlahan.', 'https://www.youtube.com/embed/g6qbq4Lf1FI'),
     bicepCurl: ex('Barbell Bicep Curl', 'Isolasi bicep tanpa mengayunkan punggung.', 'https://www.youtube.com/embed/kwG2ipFRgfo'),
     hammerCurl: ex('DB Hammer Curl', 'Genggaman netral untuk brachialis yang tebal.', 'https://www.youtube.com/embed/zC3nLlEvin4'),
 
@@ -119,7 +121,7 @@ export const generateWorkoutPlan = (
     hipThrust: ex('Barbell Hip Thrust', 'Peras otot glutes di puncak gerakan.', 'https://www.youtube.com/embed/xMaeGQEAaw0'),
     calfRaise: ex('Standing Calf Raise', 'Naik hingga menjinjit maksimal, turun perlahan.', 'https://www.youtube.com/embed/-M4-G8p8fmc'),
 
-    // CORE & EXTRA
+    // CORE (Hanya untuk Leg Day / Full Body)
     cableCrunch: ex('Cable Crunch', 'Lengkungkan punggung, fokus kontraksi perut.', 'https://www.youtube.com/embed/htG-a8T9aVw'),
     legRaise: ex('Hanging Leg Raise', 'Gunakan otot perut bawah untuk mengangkat kaki.', 'https://www.youtube.com/embed/Pr1ieGZ5atk')
   };
@@ -131,7 +133,7 @@ export const generateWorkoutPlan = (
       name,
       type: 'Workout',
       isToday,
-      exercises: exercisesList.slice(0, maxExercises) // Otomatis potong 6 untuk Pemula, 7 untuk Menengah/Mahir
+      exercises: exercisesList.slice(0, maxExercises)
     };
   };
 
@@ -167,8 +169,8 @@ export const generateWorkoutPlan = (
       buildSession('SEN', 'Upper A', [db.bench, db.pullup, db.ohp, db.bbRow, db.latRaise, db.bicepCurl, db.tricepPush], true),
       buildSession('SEL', 'Lower A', [db.squat, db.rdl, db.legPress, db.legCurl, db.calfRaise, db.hipThrust, db.cableCrunch]),
       restDay('RAB'),
-      buildSession('KAM', 'Push B', [db.incPress, db.ohp, db.cableCross, db.latRaise, db.tricepPush, db.ohTricep, db.legRaise]),
-      buildSession('JUM', 'Pull B', [db.latPull, db.dbRow, db.pullup, db.facePull, db.bicepCurl, db.hammerCurl, db.cableCrunch]),
+      buildSession('KAM', 'Push B', [db.incPress, db.ohp, db.cableCross, db.pecDeck, db.latRaise, db.tricepPush, db.ohTricep]),
+      buildSession('JUM', 'Pull B', [db.latPull, db.dbRow, db.pullup, db.facePull, db.shrug, db.bicepCurl, db.hammerCurl]),
       buildSession('SAB', 'Legs B', [db.legPress, db.bulgarian, db.legExt, db.legCurl, db.hipThrust, db.calfRaise, db.legRaise]),
       restDay('MIN')
     ];
@@ -177,11 +179,11 @@ export const generateWorkoutPlan = (
   if (days === 6) {
     return [
       buildSession('SEN', 'Push A', [db.bench, db.ohp, db.incPress, db.cableCross, db.latRaise, db.tricepPush, db.ohTricep], true),
-      buildSession('SEL', 'Pull A', [db.pullup, db.bbRow, db.latPull, db.facePull, db.bicepCurl, db.hammerCurl, db.cableCrunch]),
-      buildSession('RAB', 'Legs A', [db.squat, db.rdl, db.legPress, db.legCurl, db.calfRaise, db.hipThrust, db.legRaise]),
-      buildSession('KAM', 'Push B', [db.incPress, db.latRaise, db.cableCross, db.ohp, db.tricepPush, db.ohTricep, db.cableCrunch]),
-      buildSession('JUM', 'Pull B', [db.latPull, db.dbRow, db.facePull, db.bicepCurl, db.hammerCurl, db.pullup, db.legRaise]),
-      buildSession('SAB', 'Legs B', [db.legPress, db.bulgarian, db.legExt, db.legCurl, db.calfRaise, db.hipThrust, db.cableCrunch]),
+      buildSession('SEL', 'Pull A', [db.pullup, db.bbRow, db.latPull, db.facePull, db.shrug, db.bicepCurl, db.hammerCurl]),
+      buildSession('RAB', 'Legs A', [db.squat, db.rdl, db.legPress, db.legCurl, db.calfRaise, db.hipThrust, db.cableCrunch]),
+      buildSession('KAM', 'Push B', [db.incPress, db.latRaise, db.cableCross, db.pecDeck, db.ohp, db.tricepPush, db.ohTricep]),
+      buildSession('JUM', 'Pull B', [db.latPull, db.dbRow, db.facePull, db.pullup, db.shrug, db.bicepCurl, db.hammerCurl]),
+      buildSession('SAB', 'Legs B', [db.legPress, db.bulgarian, db.legExt, db.legCurl, db.calfRaise, db.hipThrust, db.legRaise]),
       restDay('MIN')
     ];
   }
