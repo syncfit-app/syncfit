@@ -9,57 +9,70 @@ import {
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
 
 export const WorkoutView: React.FC = () => {
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [formExp, setFormExp] = useState<Experience>('Menengah');
-  const [formDays, setFormDays] = useState(4);
-  const [formGoal, setFormGoal] = useState<Goal>('Hypertrophy');
-  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  // 1. STATE KONFIGURASI (Disimpan di localStorage)
+  const [formExp, setFormExp] = useState<Experience>(() => (localStorage.getItem('sfit_exp') as Experience) || 'Menengah');
+  const [formDays, setFormDays] = useState(() => parseInt(localStorage.getItem('sfit_days') || '4', 10));
+  const [formGoal, setFormGoal] = useState<Goal>(() => (localStorage.getItem('sfit_goal') as Goal) || 'Hypertrophy');
+  const [selectedWeek, setSelectedWeek] = useState<number>(() => parseInt(localStorage.getItem('sfit_week') || '1', 10));
 
+  // 2. STATE DATA PROGRAM (Disimpan di localStorage)
   const [activePlan, setActivePlan] = useState<DayPlan[]>(() => {
     const saved = localStorage.getItem('sfit_workout_plan');
     return saved ? JSON.parse(saved) : [];
   });
-
   const [selectedDay, setSelectedDay] = useState(() => {
     const saved = localStorage.getItem('sfit_selected_day');
     return saved ? JSON.parse(saved) : 0;
   });
-
   const [completedExercises, setCompletedExercises] = useState<Record<number, number[]>>(() => {
     const saved = localStorage.getItem('sfit_completed_exercises');
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [activeDemo, setActiveDemo] = useState<GeneratedExercise | null>(null);
-  const [isWorkoutActive, setIsWorkoutActive] = useState(false);
-  const [isTimerMinimized, setIsTimerMinimized] = useState(false);
+  // 3. STATE TIMER & SESI LATIHAN (Menggunakan Timestamp agar bertahan saat pindah tab)
+  const [isWorkoutActive, setIsWorkoutActive] = useState(() => localStorage.getItem('sfit_is_active') === 'true');
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(() => {
+    const saved = localStorage.getItem('sfit_start_time');
+    return saved ? parseInt(saved, 10) : null;
+  });
+  const [isTimerMinimized, setIsTimerMinimized] = useState(() => localStorage.getItem('sfit_timer_minimized') === 'true');
   const [timer, setTimer] = useState(0);
 
+  // Modals
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [activeDemo, setActiveDemo] = useState<GeneratedExercise | null>(null);
   const [isRecapModalOpen, setIsRecapModalOpen] = useState(false);
   const [workoutStats, setWorkoutStats] = useState({ duration: 0, calories: 0, date: '' });
 
   const hasActivePlan = activePlan.length > 0;
+  const activeWorkout = activePlan[selectedDay];
 
-  useEffect(() => {
-    localStorage.setItem('sfit_workout_plan', JSON.stringify(activePlan));
-  }, [activePlan]);
+  // --- EFEK PENYIMPANAN OTOMATIS KE LOCALSTORAGE ---
+  useEffect(() => { localStorage.setItem('sfit_exp', formExp); }, [formExp]);
+  useEffect(() => { localStorage.setItem('sfit_days', formDays.toString()); }, [formDays]);
+  useEffect(() => { localStorage.setItem('sfit_goal', formGoal); }, [formGoal]);
+  useEffect(() => { localStorage.setItem('sfit_week', selectedWeek.toString()); }, [selectedWeek]);
+  useEffect(() => { localStorage.setItem('sfit_workout_plan', JSON.stringify(activePlan)); }, [activePlan]);
+  useEffect(() => { localStorage.setItem('sfit_selected_day', JSON.stringify(selectedDay)); }, [selectedDay]);
+  useEffect(() => { localStorage.setItem('sfit_completed_exercises', JSON.stringify(completedExercises)); }, [completedExercises]);
+  useEffect(() => { localStorage.setItem('sfit_is_active', isWorkoutActive.toString()); }, [isWorkoutActive]);
+  useEffect(() => { localStorage.setItem('sfit_timer_minimized', isTimerMinimized.toString()); }, [isTimerMinimized]);
 
-  useEffect(() => {
-    localStorage.setItem('sfit_selected_day', JSON.stringify(selectedDay));
-  }, [selectedDay]);
-
-  useEffect(() => {
-    localStorage.setItem('sfit_completed_exercises', JSON.stringify(completedExercises));
-  }, [completedExercises]);
-
+  // --- LOGIKA TIMER ANTI-RESET ---
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (isWorkoutActive) {
-      interval = setInterval(() => setTimer((prev) => prev + 1), 1000);
+    if (isWorkoutActive && sessionStartTime) {
+      // Set timer saat awal load (menghitung selisih waktu sekarang dengan start time)
+      setTimer(Math.floor((Date.now() - sessionStartTime) / 1000));
+      
+      interval = setInterval(() => {
+        setTimer(Math.floor((Date.now() - sessionStartTime) / 1000));
+      }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isWorkoutActive]);
+  }, [isWorkoutActive, sessionStartTime]);
 
+  // --- HANDLER FUNCTIONS ---
   const handleGeneratePlan = () => {
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal, selectedWeek);
     setActivePlan(newPlan);
@@ -89,23 +102,35 @@ export const WorkoutView: React.FC = () => {
     });
   };
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+  const handleStartSession = () => {
+    const now = Date.now();
+    setSessionStartTime(now);
+    localStorage.setItem('sfit_start_time', now.toString());
+    setIsWorkoutActive(true);
+    setIsTimerMinimized(false);
   };
-
-  const activeWorkout = activePlan[selectedDay];
 
   const handleEndSession = () => {
     setIsWorkoutActive(false);
+    setIsTimerMinimized(false);
+    localStorage.removeItem('sfit_is_active');
+    localStorage.removeItem('sfit_start_time');
+    
     setWorkoutStats({
       duration: timer,
       calories: Math.max(5, Math.round((timer / 60) * 7.5)),
       date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()),
     });
+    
     setIsRecapModalOpen(true);
+    setSessionStartTime(null);
     setTimer(0);
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   const downloadRecapPNG = async () => {
@@ -162,6 +187,8 @@ export const WorkoutView: React.FC = () => {
         </div>
       ) : (
         <div className="animate-fade-in space-y-6">
+          
+          {/* HEADER SECTION */}
           <div className="bg-[#111827] text-white p-6 sm:p-8 rounded-3xl shadow-sm relative overflow-hidden border border-slate-800">
             <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#FF5E00]/20 rounded-full blur-3xl pointer-events-none" />
             
@@ -202,10 +229,7 @@ export const WorkoutView: React.FC = () => {
 
                 {activeWorkout?.type !== 'Rest' && (
                   <button 
-                    onClick={() => {
-                      setIsWorkoutActive(true);
-                      setIsTimerMinimized(false);
-                    }}
+                    onClick={handleStartSession}
                     disabled={isWorkoutActive}
                     className={`w-full md:w-auto py-3.5 px-6 rounded-xl font-black transition-all flex items-center justify-center gap-2 shadow-sm whitespace-nowrap ${
                       isWorkoutActive 
@@ -230,15 +254,13 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
+          {/* PERIODISASI MINGGUAN */}
           <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
                 <Zap className="w-4 h-4 text-[#FF5E00]" />
                 Fase Periodisasi
               </h3>
-              <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                Pilih Minggu <ArrowRight className="w-3 h-3" />
-              </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
@@ -262,6 +284,7 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
+          {/* JADWAL HARI */}
           <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
@@ -296,6 +319,7 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
+          {/* LIST LATIHAN */}
           {activeWorkout?.type === 'Rest' ? (
             <div className="bg-white py-12 px-6 rounded-3xl border border-slate-100 shadow-sm text-center space-y-3">
               <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto mb-4">
@@ -364,6 +388,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
+      {/* FLOAT TIMER SESI AKTIF */}
       {isWorkoutActive && (
         <div className={`fixed transition-all duration-500 ease-in-out ${isTimerMinimized ? 'bottom-28 sm:bottom-6 right-4 sm:right-6 z-[60]' : 'inset-0 z-[100] bg-[#111827]/80 backdrop-blur-sm flex items-center justify-center p-4'}`}>
           {!isTimerMinimized ? (
@@ -410,11 +435,10 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL REKAP - STRAVA STICKER STYLE TRANSPARENT */}
+      {/* MODAL REKAP STRAVA-STYLE (CENTERED, NO ICONS) */}
       {isRecapModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-4 overflow-y-auto">
           
-          {/* STICKER CONTAINER */}
           <div 
             id="strava-sticker-card" 
             className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-4"
@@ -450,25 +474,23 @@ export const WorkoutView: React.FC = () => {
               </span>
             </div>
 
-            {/* 4. List Gerakan Diselesaikan (Rata Kiri, Posisi Tengah) */}
+            {/* 4. List Gerakan Diselesaikan (CENTER, TANPA IKON) */}
             {completedExercises[selectedDay] && completedExercises[selectedDay].length > 0 && (
               <div className="w-full flex flex-col items-center mb-6">
                 <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-3" style={textShadowStyle}>
                   Exercises Completed
                 </span>
-                {/* Lebar container disesuaikan agar rapi sejajar ke bawah */}
-                <div className="flex flex-col items-start gap-2 max-w-[250px] w-full px-2">
+                <div className="flex flex-col items-center gap-1.5 w-full px-2">
                   {completedExercises[selectedDay].map(idx => (
-                    <div key={idx} className="flex items-center gap-3 text-sm font-bold text-white w-full">
-                      <CheckCircle2 className="w-5 h-5 text-[#FF5E00] shrink-0" style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.8))' }} />
-                      <span className="text-left leading-tight" style={textShadowStyle}>{activeWorkout?.exercises[idx].name}</span>
-                    </div>
+                    <span key={idx} className="text-[13.5px] sm:text-sm font-bold text-white text-center leading-tight tracking-wide" style={textShadowStyle}>
+                      {activeWorkout?.exercises[idx].name}
+                    </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* 5. Ikon Dumbbell Asli dari File png */}
+            {/* 5. Ikon Dumbbell */}
             <div className="my-2 flex justify-center">
               <img 
                 src="/dumbble.png" 
@@ -477,7 +499,7 @@ export const WorkoutView: React.FC = () => {
               />
             </div>
 
-            {/* 6. Logo Teks SYNCFIT Bersih */}
+            {/* 6. Logo */}
             <div className="flex items-center justify-center mt-6 mb-2">
               <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>
                 SYNC<span className="text-[#FF5E00]">FIT</span>
@@ -496,13 +518,14 @@ export const WorkoutView: React.FC = () => {
               onClick={downloadRecapPNG} 
               className="flex-1 py-4 bg-[#FF5E00] hover:bg-[#E05300] transition-colors rounded-2xl text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
             >
-              <Download className="w-5 h-5" /> Simpan Stiker PNG
+              <Download className="w-5 h-5" /> Simpan Stiker
             </button>
           </div>
 
         </div>
       )}
 
+      {/* MODAL KONFIGURASI PROGRAM */}
       {isConfigModalOpen && (
         <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
@@ -552,6 +575,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL DEMO VIDEO */}
       {activeDemo && (
         <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl animate-fade-in">
