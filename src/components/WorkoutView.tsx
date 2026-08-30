@@ -60,7 +60,6 @@ export const WorkoutView: React.FC = () => {
     return () => clearInterval(interval);
   }, [isWorkoutActive]);
 
-  // Handler Generate Program dari Modal (Awal Config)
   const handleGeneratePlan = () => {
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal, selectedWeek);
     setActivePlan(newPlan);
@@ -69,12 +68,11 @@ export const WorkoutView: React.FC = () => {
     setSelectedDay(0);
   };
 
-  // Handler Ganti Minggu Periodisasi (Langsung Ubah Data Sets/Reps)
   const handleWeekChange = (week: number) => {
     setSelectedWeek(week);
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal, week);
     setActivePlan(newPlan);
-    setCompletedExercises({}); // Reset log saat ganti minggu
+    setCompletedExercises({}); 
     setSelectedDay(0);
   };
 
@@ -164,7 +162,6 @@ export const WorkoutView: React.FC = () => {
         </div>
       ) : (
         <div className="animate-fade-in space-y-6">
-          {/* HEADER WORKOUT */}
           <div className="bg-[#111827] text-white p-6 sm:p-8 rounded-3xl shadow-sm relative overflow-hidden border border-slate-800">
             <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#FF5E00]/20 rounded-full blur-3xl pointer-events-none" />
             
@@ -198,7 +195,6 @@ export const WorkoutView: React.FC = () => {
               <div className="flex flex-row items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
                 <button 
                   onClick={() => setIsConfigModalOpen(true)}
-                  title="Atur Ulang Program"
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-3.5 rounded-xl font-bold transition-all border border-slate-700 shrink-0 flex-none"
                 >
                   <Settings2 className="w-5 h-5" />
@@ -234,7 +230,6 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
-          {/* CARD PERIODISASI MINGGUAN (Pindah kesini) */}
           <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
@@ -267,7 +262,6 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
-          {/* WEEKLY SPLIT STRIP */}
           <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
@@ -302,7 +296,6 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
-          {/* GERAKAN UTAMA */}
           {activeWorkout?.type === 'Rest' ? (
             <div className="bg-white py-12 px-6 rounded-3xl border border-slate-100 shadow-sm text-center space-y-3">
               <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto mb-4">
@@ -371,7 +364,6 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL STOPWATCH */}
       {isWorkoutActive && (
         <div className={`fixed transition-all duration-500 ease-in-out ${isTimerMinimized ? 'bottom-28 sm:bottom-6 right-4 sm:right-6 z-[60]' : 'inset-0 z-[100] bg-[#111827]/80 backdrop-blur-sm flex items-center justify-center p-4'}`}>
           {!isTimerMinimized ? (
@@ -422,7 +414,7 @@ export const WorkoutView: React.FC = () => {
       {isRecapModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-4 overflow-y-auto">
           
-          {/* STICKER CONTAINER (ID: strava-sticker-card) */}
+          {/* STICKER CONTAINER */}
           <div 
             id="strava-sticker-card" 
             className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-4"
@@ -458,38 +450,41 @@ export const WorkoutView: React.FC = () => {
               </span>
             </div>
 
-            {/* 4. List Gerakan Diselesaikan (Rata Kiri, Tengah) */}
+            {/* 4. List Gerakan Diselesaikan (Rata Kiri, Posisi Tengah) */}
             {completedExercises[selectedDay] && completedExercises[selectedDay].length > 0 && (
               <div className="w-full flex flex-col items-center mb-6">
                 <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-3" style={textShadowStyle}>
                   Exercises Completed
                 </span>
-                <div className="flex flex-col items-start gap-1.5">
+                {/* Lebar container disesuaikan agar rapi sejajar ke bawah */}
+                <div className="flex flex-col items-start gap-2 max-w-[250px] w-full px-2">
                   {completedExercises[selectedDay].map(idx => (
-                    <div key={idx} className="flex items-center gap-2 text-sm font-bold text-white">
-                      <CheckCircle2 className="w-4 h-4 text-[#FF5E00] shrink-0" style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.8))' }} />
-                      <span style={textShadowStyle}>{activeWorkout?.exercises[idx].name}</span>
+                    <div key={idx} className="flex items-center gap-3 text-sm font-bold text-white w-full">
+                      <CheckCircle2 className="w-5 h-5 text-[#FF5E00] shrink-0" style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.8))' }} />
+                      <span className="text-left leading-tight" style={textShadowStyle}>{activeWorkout?.exercises[idx].name}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* 5. Ikon Dumbbell Orange Besar */}
-            <div className="my-2">
-              <Dumbbell className="w-16 h-16 text-[#FF5E00] stroke-[2.2]" style={{ filter: 'drop-shadow(0px 4px 12px rgba(0,0,0,0.9))' }} />
+            {/* 5. Ikon Dumbbell Asli dari File png */}
+            <div className="my-2 flex justify-center">
+              <img 
+                src="/dumbble.png" 
+                alt="Dumbbell Icon" 
+                className="w-24 h-24 object-contain bg-transparent drop-shadow-md" 
+              />
             </div>
 
-            {/* 6. Logo Header SYNCFIT Real Image */}
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <img src="/logo.png" alt="SyncFit Logo" className="w-8 h-8 object-contain drop-shadow-md" />
-              <span className="font-black text-2xl italic tracking-wider text-white" style={textShadowStyle}>
+            {/* 6. Logo Teks SYNCFIT Bersih */}
+            <div className="flex items-center justify-center mt-6 mb-2">
+              <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>
                 SYNC<span className="text-[#FF5E00]">FIT</span>
               </span>
             </div>
           </div>
 
-          {/* Tombol Aksi */}
           <div className="flex flex-row gap-3 w-full max-w-sm px-4">
             <button 
               onClick={() => setIsRecapModalOpen(false)} 
@@ -508,7 +503,6 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL KONFIGURASI PROGRAM */}
       {isConfigModalOpen && (
         <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
@@ -558,7 +552,6 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DEMO */}
       {activeDemo && (
         <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl animate-fade-in">
