@@ -1,7 +1,7 @@
 // src/components/WorkoutView.tsx
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
-import { supabase } from '../lib/supabase'; // <-- Pastikan path ini sesuai dengan file config Supabase Anda
+import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download
@@ -387,7 +387,7 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
-          {/* JADWAL HARI */}
+          {/* JADWAL HARI - DIUBAH MENJADI D1, D2, D3, DST */}
           <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
@@ -411,7 +411,7 @@ export const WorkoutView: React.FC = () => {
                     `}
                   >
                     <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider ${isActive ? 'text-[#FF5E00]' : 'text-slate-400'}`}>
-                      {item.dayLabel}
+                      D{index + 1}
                     </span>
                     <span className={`text-[9px] sm:text-xs font-bold truncate w-full px-1 text-center mt-0.5 ${isActive ? 'text-white' : 'text-slate-700'}`}>
                       {item.name === 'Rest Day' ? 'Rest' : item.name}
@@ -490,7 +490,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* FLOAT TIMER & MODALS SAMA SEPERTI SEBELUMNYA */}
+      {/* FLOAT TIMER & MODALS */}
       {isWorkoutActive && (
         <div className={`fixed transition-all duration-500 ease-in-out ${isTimerMinimized ? 'bottom-28 sm:bottom-6 right-4 sm:right-6 z-[60]' : 'inset-0 z-[100] bg-[#111827]/80 backdrop-blur-sm flex items-center justify-center p-4'}`}>
           {!isTimerMinimized ? (
