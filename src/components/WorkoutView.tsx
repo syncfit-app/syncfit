@@ -167,17 +167,19 @@ export const WorkoutView: React.FC = () => {
     setIsTimerMinimized(false);
   };
 
-  const handleEndSession = () => {
+  // LOGIKA AKHIRI SESI & SIMPAN KE LOGS DATABASE
+  const handleEndSession = async () => {
     setIsWorkoutActive(false);
     setIsTimerMinimized(false);
     localStorage.removeItem('sfit_is_active');
     localStorage.removeItem('sfit_start_time');
     
-    // Logika Kalori Saintifik (MET)
+    // 1. Logika Kalori Saintifik (MET)
     const userWeightKg = parseFloat(localStorage.getItem('sfit_user_weight') || '70');
     const MET_VALUE = 5.0; 
     const calculatedCalories = Math.max(5, Math.round((MET_VALUE * userWeightKg * timer) / 3600));
     
+    // 2. Set State untuk Modal Stiker
     setWorkoutStats({
       duration: timer,
       calories: calculatedCalories,
@@ -185,6 +187,38 @@ export const WorkoutView: React.FC = () => {
     });
     
     setIsRecapModalOpen(true);
+    
+    // 3. AMBIL DATA GERAKAN YANG SELESAI
+    const completedExerciseNames = completedExercises[selectedDay] 
+      ? completedExercises[selectedDay].map(idx => activeWorkout?.exercises[idx].name)
+      : [];
+
+    // 4. SIMPAN KE SUPABASE
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { error } = await supabase
+          .from('workout_logs')
+          .insert({
+            user_id: user.id,
+            workout_name: activeWorkout?.name || 'Workout Session',
+            duration_seconds: timer,
+            calories_burned: calculatedCalories,
+            exercises_completed: completedExerciseNames
+          });
+
+        if (error) {
+          console.error("Gagal menyimpan riwayat latihan:", error);
+        } else {
+          console.log("Riwayat latihan berhasil disimpan ke cloud!");
+        }
+      }
+    } catch (e) {
+      console.error("Terjadi kesalahan saat menyimpan log:", e);
+    }
+
+    // 5. Reset Timer
     setSessionStartTime(null);
     setTimer(0);
   };
