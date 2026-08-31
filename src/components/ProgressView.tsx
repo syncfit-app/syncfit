@@ -10,13 +10,13 @@ interface ChartPoint {
 }
 
 const weeklyData: ChartPoint[] = [
-  { label: 'Sen', calories: 250, duration: 45 },
-  { label: 'Sel', calories: 420, duration: 60 },
-  { label: 'Rab', calories: 150, duration: 30 },
-  { label: 'Kam', calories: 580, duration: 90 },
-  { label: 'Jum', calories: 320, duration: 50 },
-  { label: 'Sab', calories: 650, duration: 100 },
-  { label: 'Min', calories: 0, duration: 0 },
+  { label: 'D1', calories: 250, duration: 45 },
+  { label: 'D2', calories: 420, duration: 60 },
+  { label: 'D3', calories: 150, duration: 30 },
+  { label: 'D4', calories: 580, duration: 90 },
+  { label: 'D5', calories: 320, duration: 50 },
+  { label: 'D6', calories: 650, duration: 100 },
+  { label: 'D7', calories: 0, duration: 0 },
 ];
 
 const monthlyData: ChartPoint[] = [
