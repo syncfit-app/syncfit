@@ -1,7 +1,7 @@
 // src/components/OnboardingView.tsx
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { ArrowRight, Loader2, User, Activity, Target, LogOut, Utensils } from 'lucide-react';
+import { ArrowRight, Loader2, User, Target, LogOut } from 'lucide-react';
 
 interface OnboardingViewProps {
   onComplete: () => void;
@@ -11,16 +11,13 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
-  // PERBAIKAN 1: Default value menggunakan huruf kecil dan garis bawah sesuai SQL
+  // Data onboarding disederhanakan
   const [formData, setFormData] = useState({
     full_name: '',
+    gender: 'male',
     age: '',
     weight_kg: '',
     height_cm: '',
-    fitness_goal: 'hypertrophy',
-    activity_level: 'moderate',
-    diet_type: 'omnivore',
-    food_style: 'indonesian_everyday',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -41,16 +38,16 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
         .upsert({
           id: user.id,
           full_name: formData.full_name,
+          gender: formData.gender,
           age: parseInt(formData.age),
           weight_kg: parseFloat(formData.weight_kg),
           height_cm: parseFloat(formData.height_cm),
-          fitness_goal: formData.fitness_goal,
-          activity_level: formData.activity_level,
-          diet_type: formData.diet_type,
-          food_style: formData.food_style,
         });
 
       if (dbError) throw dbError;
+      
+      // Simpan berat badan ke localStorage untuk engine kalori di WorkoutView
+      localStorage.setItem('sfit_user_weight', formData.weight_kg);
       
       onComplete();
       
@@ -68,14 +65,14 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-3xl border border-[#F1F5F9] shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-3xl">
+      <div className="bg-white p-8 rounded-3xl border border-[#F1F5F9] shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-xl">
         
         <div className="text-center mb-8">
           <h1 className="text-2xl md:text-3xl font-black tracking-tight uppercase text-[#111827]">
             Lengkapi <span className="text-[#FF5E00]">Profil Anda</span>
           </h1>
           <p className="text-sm font-medium text-[#64748B] mt-2">
-            Kami membutuhkan sedikit data untuk mempersonalisasi program SyncFit Anda.
+            Informasi dasar untuk menghitung metrik dan kalori Anda.
           </p>
         </div>
 
@@ -101,7 +98,19 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Jenis Kelamin</label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
+              >
+                <option value="male">Laki-laki</option>
+                <option value="female">Perempuan</option>
+              </select>
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Umur (Tahun)</label>
               <input
@@ -114,6 +123,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 placeholder="Misal: 25"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Berat (Kg)</label>
               <input
@@ -137,76 +149,6 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete }) =>
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
                 placeholder="Misal: 175"
               />
-            </div>
-          </div>
-
-          {/* PERBAIKAN 2: Semua opsi <option value="..."> disamakan persis dengan SQL Check Constraints */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
-                <Activity className="w-4 h-4 text-[#FF5E00]" /> Aktivitas
-              </label>
-              <select
-                name="activity_level"
-                value={formData.activity_level}
-                onChange={handleChange}
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
-              >
-                <option value="sedentary">Sedentari (Jarang)</option>
-                <option value="light">Aktif Ringan (1-3x/Mgg)</option>
-                <option value="moderate">Aktif (3-5x/Mgg)</option>
-                <option value="very_active">Sangat Aktif (Atlet)</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
-                <Target className="w-4 h-4 text-[#FF5E00]" /> Tujuan
-              </label>
-              <select
-                name="fitness_goal"
-                value={formData.fitness_goal}
-                onChange={handleChange}
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
-              >
-                <option value="hypertrophy">Otot (Hypertrophy)</option>
-                <option value="fat_loss">Lemak (Fat Loss)</option>
-                <option value="strength">Kekuatan (Strength)</option>
-                <option value="recomposition">Re-komposisi Tubuh</option>
-                <option value="general_fitness">Pemeliharaan (Maintenance)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-[#FF5E00]" /> Diet
-              </label>
-              <select
-                name="diet_type"
-                value={formData.diet_type}
-                onChange={handleChange}
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
-              >
-                <option value="omnivore">Omnivora (Bebas)</option>
-                <option value="vegetarian">Vegetarian</option>
-                <option value="vegan">Vegan</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-[#FF5E00]" /> Gaya Makanan
-              </label>
-              <select
-                name="food_style"
-                value={formData.food_style}
-                onChange={handleChange}
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-3 text-sm font-medium text-[#111827] focus:outline-none focus:border-[#FF5E00] focus:ring-1 focus:ring-[#FF5E00]"
-              >
-                <option value="indonesian_everyday">Harian Indonesia</option>
-                <option value="high_protein">Tinggi Protein (Fitness)</option>
-                <option value="budget_friendly">Ramah Kantong (Budget)</option>
-              </select>
             </div>
           </div>
 
