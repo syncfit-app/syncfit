@@ -1,6 +1,7 @@
 // src/components/WorkoutView.tsx
 import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
+import { supabase } from '../lib/supabase'; // <-- Pastikan path ini sesuai dengan file config Supabase Anda
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download
@@ -9,17 +10,15 @@ import {
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
 
 export const WorkoutView: React.FC = () => {
-  // 1. STATE KONFIGURASI (Disimpan di localStorage)
-  const [formExp, setFormExp] = useState<Experience>(() => (localStorage.getItem('sfit_exp') as Experience) || 'Menengah');
-  const [formDays, setFormDays] = useState(() => parseInt(localStorage.getItem('sfit_days') || '4', 10));
-  const [formGoal, setFormGoal] = useState<Goal>(() => (localStorage.getItem('sfit_goal') as Goal) || 'Hypertrophy');
-  const [selectedWeek, setSelectedWeek] = useState<number>(() => parseInt(localStorage.getItem('sfit_week') || '1', 10));
+  // 1. STATE CLOUD (Disinkronkan dengan Supabase)
+  const [isLoading, setIsLoading] = useState(true);
+  const [formExp, setFormExp] = useState<Experience>('Menengah');
+  const [formDays, setFormDays] = useState(4);
+  const [formGoal, setFormGoal] = useState<Goal>('Hypertrophy');
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [activePlan, setActivePlan] = useState<DayPlan[]>([]);
 
-  // 2. STATE DATA PROGRAM (Disimpan di localStorage)
-  const [activePlan, setActivePlan] = useState<DayPlan[]>(() => {
-    const saved = localStorage.getItem('sfit_workout_plan');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // 2. STATE LOKAL SESI (Harian)
   const [selectedDay, setSelectedDay] = useState(() => {
     const saved = localStorage.getItem('sfit_selected_day');
     return saved ? JSON.parse(saved) : 0;
@@ -47,18 +46,72 @@ export const WorkoutView: React.FC = () => {
   const hasActivePlan = activePlan.length > 0;
   const activeWorkout = activePlan[selectedDay];
 
-  // --- EFEK PENYIMPANAN OTOMATIS KE LOCALSTORAGE ---
-  useEffect(() => { localStorage.setItem('sfit_exp', formExp); }, [formExp]);
-  useEffect(() => { localStorage.setItem('sfit_days', formDays.toString()); }, [formDays]);
-  useEffect(() => { localStorage.setItem('sfit_goal', formGoal); }, [formGoal]);
-  useEffect(() => { localStorage.setItem('sfit_week', selectedWeek.toString()); }, [selectedWeek]);
-  useEffect(() => { localStorage.setItem('sfit_workout_plan', JSON.stringify(activePlan)); }, [activePlan]);
+  // --- EFEK FETCH DATA DARI SUPABASE SAAT MOUNT ---
+  useEffect(() => {
+    const fetchProgram = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('user_programs')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (data) {
+          setFormExp(data.experience as Experience);
+          setFormDays(data.days);
+          setFormGoal(data.goal as Goal);
+          setSelectedWeek(data.current_week);
+          setActivePlan(data.plan_data);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil program:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProgram();
+  }, []);
+
+  // --- FUNGSI SIMPAN KE SUPABASE ---
+  const saveProgramToDB = async (
+    exp: Experience, 
+    days: number, 
+    goal: Goal, 
+    week: number, 
+    plan: DayPlan[]
+  ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('user_programs')
+      .upsert({
+        user_id: user.id,
+        experience: exp,
+        days: days,
+        goal: goal,
+        current_week: week,
+        plan_data: plan,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) console.error("Gagal menyimpan ke database:", error);
+  };
+
+  // --- PENYIMPANAN STATE LOKAL (TIMER & STATUS HARIAN) ---
   useEffect(() => { localStorage.setItem('sfit_selected_day', JSON.stringify(selectedDay)); }, [selectedDay]);
   useEffect(() => { localStorage.setItem('sfit_completed_exercises', JSON.stringify(completedExercises)); }, [completedExercises]);
   useEffect(() => { localStorage.setItem('sfit_is_active', isWorkoutActive.toString()); }, [isWorkoutActive]);
   useEffect(() => { localStorage.setItem('sfit_timer_minimized', isTimerMinimized.toString()); }, [isTimerMinimized]);
 
-  // --- LOGIKA TIMER ANTI-RESET ---
+  // --- LOGIKA TIMER ---
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isWorkoutActive && sessionStartTime) {
@@ -70,21 +123,27 @@ export const WorkoutView: React.FC = () => {
     return () => clearInterval(interval);
   }, [isWorkoutActive, sessionStartTime]);
 
-  // --- HANDLER FUNCTIONS ---
-  const handleGeneratePlan = () => {
+  // --- HANDLERS ---
+  const handleGeneratePlan = async () => {
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal, selectedWeek);
     setActivePlan(newPlan);
     setCompletedExercises({}); 
     setIsConfigModalOpen(false);
     setSelectedDay(0);
+    
+    // Simpan ke Supabase
+    await saveProgramToDB(formExp, formDays, formGoal, selectedWeek, newPlan);
   };
 
-  const handleWeekChange = (week: number) => {
+  const handleWeekChange = async (week: number) => {
     setSelectedWeek(week);
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal, week);
     setActivePlan(newPlan);
     setCompletedExercises({}); 
     setSelectedDay(0);
+
+    // Update periode minggu di Supabase
+    await saveProgramToDB(formExp, formDays, formGoal, week, newPlan);
   };
 
   const toggleExerciseCheck = (exerciseIndex: number) => {
@@ -114,9 +173,9 @@ export const WorkoutView: React.FC = () => {
     localStorage.removeItem('sfit_is_active');
     localStorage.removeItem('sfit_start_time');
     
-    // LOGIKA KALORI BARU (MET)
+    // Logika Kalori Saintifik (MET)
     const userWeightKg = parseFloat(localStorage.getItem('sfit_user_weight') || '70');
-    const MET_VALUE = 5.0; // Estimasi untuk angkat beban
+    const MET_VALUE = 5.0; 
     const calculatedCalories = Math.max(5, Math.round((MET_VALUE * userWeightKg * timer) / 3600));
     
     setWorkoutStats({
@@ -139,7 +198,6 @@ export const WorkoutView: React.FC = () => {
   const downloadRecapPNG = async () => {
     const element = document.getElementById('strava-sticker-card');
     if (!element) return;
-
     try {
       const canvas = await html2canvas(element, { 
         scale: 3, 
@@ -153,7 +211,6 @@ export const WorkoutView: React.FC = () => {
           }
         }
       });
-      
       const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `SyncFit-Recap-${new Date().getTime()}.png`;
@@ -166,9 +223,19 @@ export const WorkoutView: React.FC = () => {
 
   const textShadowStyle = { textShadow: '0px 2px 10px rgba(0,0,0,0.9), 0px 1px 3px rgba(0,0,0,1)' };
 
+  // --- RENDER LOADING STATE ---
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-[#FF5E00] rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-bold animate-pulse">Menyelaraskan data...</p>
+      </div>
+    );
+  }
+
+  // --- RENDER MAIN UI ---
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 pt-0 relative font-sans">
-      
       {!hasActivePlan ? (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 space-y-6 animate-fade-in">
           <div className="w-24 h-24 bg-orange-500/10 rounded-full flex items-center justify-center mb-2">
@@ -190,7 +257,6 @@ export const WorkoutView: React.FC = () => {
         </div>
       ) : (
         <div className="animate-fade-in space-y-6">
-          
           {/* HEADER SECTION */}
           <div className="bg-[#111827] text-white p-6 sm:p-8 rounded-3xl shadow-sm relative overflow-hidden border border-slate-800">
             <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#FF5E00]/20 rounded-full blur-3xl pointer-events-none" />
@@ -346,7 +412,6 @@ export const WorkoutView: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {activeWorkout?.exercises.map((ex, idx) => {
                   const isCompleted = (completedExercises[selectedDay] || []).includes(idx);
-                  
                   return (
                     <div key={idx} className={`bg-white p-5 rounded-3xl border shadow-sm flex gap-4 transition-all duration-300 ${isCompleted ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 hover:border-slate-300'}`}>
                       <button 
@@ -391,7 +456,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* FLOAT TIMER SESI AKTIF */}
+      {/* FLOAT TIMER & MODALS SAMA SEPERTI SEBELUMNYA */}
       {isWorkoutActive && (
         <div className={`fixed transition-all duration-500 ease-in-out ${isTimerMinimized ? 'bottom-28 sm:bottom-6 right-4 sm:right-6 z-[60]' : 'inset-0 z-[100] bg-[#111827]/80 backdrop-blur-sm flex items-center justify-center p-4'}`}>
           {!isTimerMinimized ? (
@@ -438,51 +503,28 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL REKAP STRAVA-STYLE (CENTERED, PERBAIKAN JARAK) */}
       {isRecapModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-4 overflow-y-auto">
-          
           <div 
             id="strava-sticker-card" 
             className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-2"
             style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
           >
-            {/* 1. Tipe Latihan */}
             <div className="mb-4">
-              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>
-                Workout
-              </span>
-              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>
-                {activeWorkout?.name}
-              </span>
+              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Workout</span>
+              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{activeWorkout?.name}</span>
             </div>
-
-            {/* 2. Durasi Latihan */}
             <div className="mb-4">
-              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>
-                Time
-              </span>
-              <span className="text-white font-black text-4xl tracking-tight block font-mono" style={textShadowStyle}>
-                {formatTime(workoutStats.duration)}
-              </span>
+              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Time</span>
+              <span className="text-white font-black text-4xl tracking-tight block font-mono" style={textShadowStyle}>{formatTime(workoutStats.duration)}</span>
             </div>
-
-            {/* 3. Estimasi Kalori */}
             <div className="mb-4">
-              <span className="text-[#FF5E00] text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>
-                Calories
-              </span>
-              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>
-                {workoutStats.calories} <span className="text-lg font-bold text-white/90">kcal</span>
-              </span>
+              <span className="text-[#FF5E00] text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Calories</span>
+              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{workoutStats.calories} <span className="text-lg font-bold text-white/90">kcal</span></span>
             </div>
-
-            {/* 4. List Gerakan Diselesaikan */}
             {completedExercises[selectedDay] && completedExercises[selectedDay].length > 0 && (
               <div className="w-full flex flex-col items-center mb-3">
-                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-2" style={textShadowStyle}>
-                  Exercises Completed
-                </span>
+                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-2" style={textShadowStyle}>Exercises Completed</span>
                 <div className="flex flex-col items-center gap-1.5 w-full px-2">
                   {completedExercises[selectedDay].map(idx => (
                     <span key={idx} className="text-[13.5px] sm:text-sm font-bold text-white text-center leading-tight tracking-wide" style={textShadowStyle}>
@@ -492,43 +534,23 @@ export const WorkoutView: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {/* 5. Ikon Dumbbell (Margin Diperkecil) */}
             <div className="mt-1 mb-1 flex justify-center">
-              <img 
-                src="/dumbble.png" 
-                alt="Dumbbell Icon" 
-                className="w-24 h-24 object-contain bg-transparent drop-shadow-md" 
-              />
+              <img src="/dumbble.png" alt="Dumbbell Icon" className="w-24 h-24 object-contain bg-transparent drop-shadow-md" />
             </div>
-
-            {/* 6. Logo (Margin Diperkecil) */}
             <div className="flex items-center justify-center mt-2 mb-1">
-              <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>
-                SYNC<span className="text-[#FF5E00]">FIT</span>
-              </span>
+              <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>SYNC<span className="text-[#FF5E00]">FIT</span></span>
             </div>
           </div>
 
           <div className="flex flex-row gap-3 w-full max-w-sm px-4">
-            <button 
-              onClick={() => setIsRecapModalOpen(false)} 
-              className="flex-none py-4 px-6 bg-slate-800 hover:bg-slate-700 transition-colors rounded-2xl text-white font-bold"
-            >
-              Tutup
-            </button>
-            <button 
-              onClick={downloadRecapPNG} 
-              className="flex-1 py-4 bg-[#FF5E00] hover:bg-[#E05300] transition-colors rounded-2xl text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
-            >
+            <button onClick={() => setIsRecapModalOpen(false)} className="flex-none py-4 px-6 bg-slate-800 hover:bg-slate-700 transition-colors rounded-2xl text-white font-bold">Tutup</button>
+            <button onClick={downloadRecapPNG} className="flex-1 py-4 bg-[#FF5E00] hover:bg-[#E05300] transition-colors rounded-2xl text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
               <Download className="w-5 h-5" /> Simpan Stiker
             </button>
           </div>
-
         </div>
       )}
 
-      {/* MODAL KONFIGURASI PROGRAM */}
       {isConfigModalOpen && (
         <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
@@ -578,7 +600,6 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DEMO VIDEO */}
       {activeDemo && (
         <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 relative shadow-2xl animate-fade-in">
