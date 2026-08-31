@@ -38,7 +38,6 @@ export const ProgressView: React.FC = () => {
   const chartData = timeRange === 'Weekly' ? weeklyData : monthlyData;
   const maxCalories = Math.max(...chartData.map((d) => d.calories), 1);
 
-  // SVG dimensions
   const svgWidth = 600;
   const svgHeight = 200;
   const paddingX = 40;
@@ -48,14 +47,12 @@ export const ProgressView: React.FC = () => {
   const usableWidth = svgWidth - paddingX * 2;
   const usableHeight = svgHeight - paddingTop - paddingBottom;
 
-  // Koordinat Poin Grafik
   const points = chartData.map((d, i) => {
     const x = paddingX + (i / (chartData.length - 1)) * usableWidth;
     const y = svgHeight - paddingBottom - (d.calories / maxCalories) * usableHeight;
     return { x, y, ...d };
   });
 
-  // Membuat Smooth Bezier Curve Path
   const createSmoothPath = (pts: typeof points) => {
     if (pts.length === 0) return '';
     let path = `M ${pts[0].x},${pts[0].y}`;
@@ -73,6 +70,36 @@ export const ProgressView: React.FC = () => {
 
   return (
     <div className="pt-0 pb-20 md:pt-6 md:pb-12 px-4 md:px-8 max-w-5xl mx-auto space-y-6 font-sans animate-fade-in">
+      {/* KEYFRAME ANIMASI CHART */}
+      <style>{`
+        @keyframes drawLine {
+          from { stroke-dashoffset: 1200; }
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes fadeInArea {
+          from { opacity: 0; transform: scaleY(0.8); }
+          to { opacity: 1; transform: scaleY(1); }
+        }
+        @keyframes popPoint {
+          0% { transform: scale(0); opacity: 0; }
+          70% { transform: scale(1.3); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .chart-line-animated {
+          stroke-dasharray: 1200;
+          stroke-dashoffset: 1200;
+          animation: drawLine 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .chart-area-animated {
+          transform-origin: bottom;
+          animation: fadeInArea 1s ease-out 0.2s forwards;
+          opacity: 0;
+        }
+        .chart-point-animated {
+          transform-origin: center;
+          animation: popPoint 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+      `}</style>
       
       {/* KARTU STATISTIK UTAMA */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -112,7 +139,7 @@ export const ProgressView: React.FC = () => {
         </div>
       </div>
 
-      {/* GRAFIK PURE SVG WORKING PROGRESS */}
+      {/* GRAFIK ANIMATED SVG */}
       <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -138,9 +165,9 @@ export const ProgressView: React.FC = () => {
           </div>
         </div>
 
-        {/* CONTAINER SVG */}
         <div className="w-full relative">
-          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible">
+          {/* Key pada SVG memaksa animasi ulang saat memindah filter Weekly/Monthly */}
+          <svg key={timeRange} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible">
             <defs>
               <linearGradient id="orangeGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#FF5E00" stopOpacity="0.35" />
@@ -148,7 +175,6 @@ export const ProgressView: React.FC = () => {
               </linearGradient>
             </defs>
 
-            {/* Horizontal Gridlines */}
             {[0, 0.5, 1].map((ratio, idx) => {
               const y = svgHeight - paddingBottom - ratio * usableHeight;
               return (
@@ -165,16 +191,15 @@ export const ProgressView: React.FC = () => {
               );
             })}
 
-            {/* Gradient Area Fill */}
-            <path d={areaPath} fill="url(#orangeGradient)" />
+            {/* Area Gradien Teranimasi */}
+            <path d={areaPath} fill="url(#orangeGradient)" className="chart-area-animated" />
 
-            {/* Smooth Curve Line */}
-            <path d={linePath} fill="none" stroke="#FF5E00" strokeWidth="4" strokeLinecap="round" />
+            {/* Garis Kurva Teranimasi (Draw Line) */}
+            <path d={linePath} fill="none" stroke="#FF5E00" strokeWidth="4" strokeLinecap="round" className="chart-line-animated" />
 
-            {/* Interactive Points & Labels */}
+            {/* Poin Titik Teranimasi */}
             {points.map((pt, i) => (
               <g key={i} className="cursor-pointer" onMouseEnter={() => setHoveredIndex(i)} onMouseLeave={() => setHoveredIndex(null)}>
-                {/* Vertical Hover Line */}
                 {hoveredIndex === i && (
                   <line 
                     x1={pt.x} 
@@ -188,12 +213,10 @@ export const ProgressView: React.FC = () => {
                   />
                 )}
 
-                {/* Outer Ring on Hover */}
                 {hoveredIndex === i && (
                   <circle cx={pt.x} cy={pt.y} r="8" fill="#FF5E00" fillOpacity="0.2" />
                 )}
 
-                {/* Point Marker */}
                 <circle 
                   cx={pt.x} 
                   cy={pt.y} 
@@ -201,10 +224,10 @@ export const ProgressView: React.FC = () => {
                   fill="#FF5E00" 
                   stroke="#FFFFFF" 
                   strokeWidth="2.5" 
-                  className="transition-all duration-200"
+                  className="chart-point-animated transition-all duration-200"
+                  style={{ animationDelay: `${0.2 + i * 0.1}s` }}
                 />
 
-                {/* X-Axis Label */}
                 <text 
                   x={pt.x} 
                   y={svgHeight - 12} 
@@ -219,7 +242,6 @@ export const ProgressView: React.FC = () => {
             ))}
           </svg>
 
-          {/* Hover Tooltip Popup */}
           {hoveredIndex !== null && (
             <div 
               className="absolute bg-white p-3 rounded-2xl shadow-xl border border-slate-100 flex flex-col gap-1 pointer-events-none transition-all z-20"
