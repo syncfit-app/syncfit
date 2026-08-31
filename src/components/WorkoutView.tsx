@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
-  Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download, ArrowRight
+  Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download
 } from 'lucide-react';
 
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
@@ -29,7 +29,7 @@ export const WorkoutView: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   });
 
-  // 3. STATE TIMER & SESI LATIHAN (Menggunakan Timestamp agar bertahan saat pindah tab)
+  // 3. STATE TIMER & SESI LATIHAN
   const [isWorkoutActive, setIsWorkoutActive] = useState(() => localStorage.getItem('sfit_is_active') === 'true');
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(() => {
     const saved = localStorage.getItem('sfit_start_time');
@@ -62,9 +62,7 @@ export const WorkoutView: React.FC = () => {
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isWorkoutActive && sessionStartTime) {
-      // Set timer saat awal load (menghitung selisih waktu sekarang dengan start time)
       setTimer(Math.floor((Date.now() - sessionStartTime) / 1000));
-      
       interval = setInterval(() => {
         setTimer(Math.floor((Date.now() - sessionStartTime) / 1000));
       }, 1000);
@@ -116,9 +114,14 @@ export const WorkoutView: React.FC = () => {
     localStorage.removeItem('sfit_is_active');
     localStorage.removeItem('sfit_start_time');
     
+    // LOGIKA KALORI BARU (MET)
+    const userWeightKg = parseFloat(localStorage.getItem('sfit_user_weight') || '70');
+    const MET_VALUE = 5.0; // Estimasi untuk angkat beban
+    const calculatedCalories = Math.max(5, Math.round((MET_VALUE * userWeightKg * timer) / 3600));
+    
     setWorkoutStats({
       duration: timer,
-      calories: Math.max(5, Math.round((timer / 60) * 7.5)),
+      calories: calculatedCalories,
       date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()),
     });
     
@@ -435,13 +438,13 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL REKAP STRAVA-STYLE (CENTERED, NO ICONS) */}
+      {/* MODAL REKAP STRAVA-STYLE (CENTERED, PERBAIKAN JARAK) */}
       {isRecapModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-4 overflow-y-auto">
           
           <div 
             id="strava-sticker-card" 
-            className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-4"
+            className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-2"
             style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
           >
             {/* 1. Tipe Latihan */}
@@ -465,7 +468,7 @@ export const WorkoutView: React.FC = () => {
             </div>
 
             {/* 3. Estimasi Kalori */}
-            <div className="mb-6">
+            <div className="mb-4">
               <span className="text-[#FF5E00] text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>
                 Calories
               </span>
@@ -474,10 +477,10 @@ export const WorkoutView: React.FC = () => {
               </span>
             </div>
 
-            {/* 4. List Gerakan Diselesaikan (CENTER, TANPA IKON) */}
+            {/* 4. List Gerakan Diselesaikan */}
             {completedExercises[selectedDay] && completedExercises[selectedDay].length > 0 && (
-              <div className="w-full flex flex-col items-center mb-6">
-                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-3" style={textShadowStyle}>
+              <div className="w-full flex flex-col items-center mb-3">
+                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-2" style={textShadowStyle}>
                   Exercises Completed
                 </span>
                 <div className="flex flex-col items-center gap-1.5 w-full px-2">
@@ -490,8 +493,8 @@ export const WorkoutView: React.FC = () => {
               </div>
             )}
 
-            {/* 5. Ikon Dumbbell */}
-            <div className="my-2 flex justify-center">
+            {/* 5. Ikon Dumbbell (Margin Diperkecil) */}
+            <div className="mt-1 mb-1 flex justify-center">
               <img 
                 src="/dumbble.png" 
                 alt="Dumbbell Icon" 
@@ -499,8 +502,8 @@ export const WorkoutView: React.FC = () => {
               />
             </div>
 
-            {/* 6. Logo */}
-            <div className="flex items-center justify-center mt-6 mb-2">
+            {/* 6. Logo (Margin Diperkecil) */}
+            <div className="flex items-center justify-center mt-2 mb-1">
               <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>
                 SYNC<span className="text-[#FF5E00]">FIT</span>
               </span>
