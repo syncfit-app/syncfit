@@ -77,27 +77,38 @@ export const ProgressView: React.FC = () => {
           to { stroke-dashoffset: 0; }
         }
         @keyframes fadeInArea {
-          from { opacity: 0; transform: scaleY(0.8); }
-          to { opacity: 1; transform: scaleY(1); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        @keyframes popPoint {
-          0% { transform: scale(0); opacity: 0; }
-          70% { transform: scale(1.3); }
-          100% { transform: scale(1); opacity: 1; }
+        @keyframes jumpUp {
+          0% {
+            transform: translateY(16px);
+            opacity: 0;
+          }
+          60% {
+            transform: translateY(-8px);
+            opacity: 1;
+          }
+          80% {
+            transform: translateY(2px);
+          }
+          100% {
+            transform: translateY(0px);
+            opacity: 1;
+          }
         }
         .chart-line-animated {
           stroke-dasharray: 1200;
           stroke-dashoffset: 1200;
-          animation: drawLine 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: drawLine 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .chart-area-animated {
-          transform-origin: bottom;
-          animation: fadeInArea 1s ease-out 0.2s forwards;
+          animation: fadeInArea 0.8s ease-out 0.3s forwards;
           opacity: 0;
         }
         .chart-point-animated {
-          transform-origin: center;
-          animation: popPoint 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          opacity: 0; /* Tersembunyi sebelum giliran animasinya mulai */
+          animation: jumpUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
       `}</style>
       
@@ -166,7 +177,6 @@ export const ProgressView: React.FC = () => {
         </div>
 
         <div className="w-full relative">
-          {/* Key pada SVG memaksa animasi ulang saat memindah filter Weekly/Monthly */}
           <svg key={timeRange} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible">
             <defs>
               <linearGradient id="orangeGradient" x1="0" y1="0" x2="0" y2="1">
@@ -225,7 +235,7 @@ export const ProgressView: React.FC = () => {
                   stroke="#FFFFFF" 
                   strokeWidth="2.5" 
                   className="chart-point-animated transition-all duration-200"
-                  style={{ animationDelay: `${0.2 + i * 0.1}s` }}
+                  style={{ animationDelay: `${0.3 + i * 0.1}s` }}
                 />
 
                 <text 
