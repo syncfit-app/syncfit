@@ -5,10 +5,16 @@ import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download,
-  Edit2, Save, Trash2, Plus
+  Edit2, Save, Trash2, Plus, Layers
 } from 'lucide-react';
 
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
+
+export interface SetDetail {
+  weight: string;
+  reps: string;
+  completed: boolean;
+}
 
 export const WorkoutView: React.FC = () => {
   // 1. STATE CLOUD (Disinkronkan dengan Supabase)
@@ -29,7 +35,14 @@ export const WorkoutView: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   });
 
-  // 3. STATE TIMER & SESI LATIHAN
+  // 3. STATE LOG SET (Beban & Reps per Set)
+  // Format Key: `${selectedDay}-${exerciseIndex}` -> SetDetail[]
+  const [exerciseSetLogs, setExerciseSetLogs] = useState<Record<string, SetDetail[]>>(() => {
+    const saved = localStorage.getItem('sfit_set_logs');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // 4. STATE TIMER & SESI LATIHAN
   const [isWorkoutActive, setIsWorkoutActive] = useState(() => localStorage.getItem('sfit_is_active') === 'true');
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(() => {
     const saved = localStorage.getItem('sfit_start_time');
@@ -58,6 +71,11 @@ export const WorkoutView: React.FC = () => {
     name: '', sets: 3, reps: '10', rir: 'RIR 2', rest: '60s', videoUrl: '', note: ''
   });
 
+  // --- STATE MODAL LOG SET (BEBAN & REPS) ---
+  const [isSetModalOpen, setIsSetModalOpen] = useState(false);
+  const [activeSetExerciseIdx, setActiveSetExerciseIdx] = useState<number | null>(null);
+  const [tempSets, setTempSets] = useState<SetDetail[]>([]);
+
   const hasActivePlan = activePlan.length > 0;
   const activeWorkout = activePlan[selectedDay];
 
@@ -80,7 +98,7 @@ export const WorkoutView: React.FC = () => {
         if (data) {
           setFormExp(data.experience as Experience);
           setFormDays(data.days);
-          setFormGoal(data.goal); // Mengambil dari database, bisa berupa custom text
+          setFormGoal(data.goal);
           setSelectedWeek(data.current_week);
           setActivePlan(data.plan_data);
         }
@@ -123,6 +141,7 @@ export const WorkoutView: React.FC = () => {
   // --- PENYIMPANAN STATE LOKAL ---
   useEffect(() => { localStorage.setItem('sfit_selected_day', JSON.stringify(selectedDay)); }, [selectedDay]);
   useEffect(() => { localStorage.setItem('sfit_completed_exercises', JSON.stringify(completedExercises)); }, [completedExercises]);
+  useEffect(() => { localStorage.setItem('sfit_set_logs', JSON.stringify(exerciseSetLogs)); }, [exerciseSetLogs]);
   useEffect(() => { localStorage.setItem('sfit_is_active', isWorkoutActive.toString()); }, [isWorkoutActive]);
   useEffect(() => { localStorage.setItem('sfit_timer_minimized', isTimerMinimized.toString()); }, [isTimerMinimized]);
 
@@ -140,7 +159,6 @@ export const WorkoutView: React.FC = () => {
 
   // --- HANDLERS PROGRAM & JADWAL ---
   const handleGeneratePlan = async () => {
-    // Generate dengan goal default jika menggunakan config
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, selectedWeek);
     setActivePlan(newPlan);
     setCompletedExercises({}); 
@@ -185,7 +203,7 @@ export const WorkoutView: React.FC = () => {
   };
 
   const openEditExercise = (idx: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // Mencegah triger area luar
+    e.stopPropagation();
     setExerciseForm({ ...activeWorkout.exercises[idx] });
     setEditingExerciseIndex(idx);
     setIsExerciseModalOpen(true);
@@ -197,7 +215,6 @@ export const WorkoutView: React.FC = () => {
     const updatedPlan = [...activePlan];
     updatedPlan[selectedDay].exercises.splice(idx, 1);
     
-    // Hapus dari state check completed jika ada
     setCompletedExercises(prev => {
       const dayCompleted = prev[selectedDay] || [];
       return { ...prev, [selectedDay]: dayCompleted.filter(i => i !== idx).map(i => i > idx ? i - 1 : i) };
@@ -222,7 +239,76 @@ export const WorkoutView: React.FC = () => {
     await saveProgramToDB(formExp, formDays, formGoal, selectedWeek, updatedPlan);
   };
 
-  const toggleExerciseCheck = (exerciseIndex: number) => {
+  // --- HANDLER MODAL LOG SET (BEBAN & REPS) ---
+  const openSetLogModal = (idx: number) => {
+    setActiveSetExerciseIdx(idx);
+    const logKey = `${selectedDay}-${idx}`;
+    const targetExercise = activeWorkout.exercises[idx];
+    const existingLogs = exerciseSetLogs[logKey];
+
+    if (existingLogs && existingLogs.length > 0) {
+      setTempSets([...existingLogs]);
+    } else {
+      // Buat baris default berdasarkan jumlah target set gerakan
+      const defaultSetsCount = targetExercise.sets || 3;
+      const initial: SetDetail[] = Array.from({ length: defaultSetsCount }, () => ({
+        weight: '',
+        reps: targetExercise.reps ? targetExercise.reps.replace(/[^0-9]/g, '') || '10' : '10',
+        completed: false
+      }));
+      setTempSets(initial);
+    }
+
+    setIsSetModalOpen(true);
+  };
+
+  const handleUpdateSetRow = (setIndex: number, field: keyof SetDetail, value: any) => {
+    setTempSets(prev => {
+      const updated = [...prev];
+      updated[setIndex] = { ...updated[setIndex], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleAddSetRow = () => {
+    setTempSets(prev => [
+      ...prev, 
+      { weight: prev[prev.length - 1]?.weight || '', reps: prev[prev.length - 1]?.reps || '10', completed: false }
+    ]);
+  };
+
+  const handleRemoveSetRow = (idx: number) => {
+    if (tempSets.length <= 1) return;
+    setTempSets(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveSetLogs = () => {
+    if (activeSetExerciseIdx === null) return;
+    const logKey = `${selectedDay}-${activeSetExerciseIdx}`;
+    
+    setExerciseSetLogs(prev => ({
+      ...prev,
+      [logKey]: tempSets
+    }));
+
+    // Otomatis centang selesai di kartu luar jika semua set di modal tercentang
+    const isAllSetsDone = tempSets.length > 0 && tempSets.every(s => s.completed);
+    setCompletedExercises(prev => {
+      const dayCompleted = prev[selectedDay] || [];
+      const hasIdx = dayCompleted.includes(activeSetExerciseIdx);
+      if (isAllSetsDone && !hasIdx) {
+        return { ...prev, [selectedDay]: [...dayCompleted, activeSetExerciseIdx] };
+      } else if (!isAllSetsDone && hasIdx) {
+        return { ...prev, [selectedDay]: dayCompleted.filter(i => i !== activeSetExerciseIdx) };
+      }
+      return prev;
+    });
+
+    setIsSetModalOpen(false);
+  };
+
+  const toggleExerciseCheck = (exerciseIndex: number, e: React.MouseEvent) => {
+    e.stopPropagation();
     setCompletedExercises((prev) => {
       const dayCompleted = prev[selectedDay] || [];
       const isChecked = dayCompleted.includes(exerciseIndex);
@@ -318,7 +404,6 @@ export const WorkoutView: React.FC = () => {
 
   const textShadowStyle = { textShadow: '0px 2px 10px rgba(0,0,0,0.9), 0px 1px 3px rgba(0,0,0,1)' };
 
-  // --- RENDER LOADING STATE ---
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -361,7 +446,6 @@ export const WorkoutView: React.FC = () => {
                   </span>
                 </div>
                 
-                {/* Edit Workout Name */}
                 {isEditingName ? (
                   <div className="flex items-center gap-2 mt-1">
                     <input type="text" value={tempDayName} onChange={(e) => setTempDayName(e.target.value)} className="bg-slate-800 text-white text-2xl sm:text-3xl font-black rounded-xl px-4 py-2 border border-slate-600 focus:outline-none focus:border-[#FF5E00] w-full max-w-[250px] sm:max-w-sm" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveDayName()} />
@@ -376,7 +460,6 @@ export const WorkoutView: React.FC = () => {
                 )}
                 
                 <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-400 mt-2">
-                  {/* Edit Goal Manual */}
                   {isEditingGoal ? (
                     <div className="flex items-center gap-1.5 bg-slate-800 p-1 rounded-lg">
                       <Settings2 className="w-4 h-4 text-[#FF5E00] ml-1" />
@@ -460,17 +543,25 @@ export const WorkoutView: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {activeWorkout?.exercises.map((ex, idx) => {
                   const isCompleted = (completedExercises[selectedDay] || []).includes(idx);
+                  const setLogsKey = `${selectedDay}-${idx}`;
+                  const currentLogs = exerciseSetLogs[setLogsKey] || [];
+                  const hasLogs = currentLogs.some(s => s.weight || s.completed);
+
                   return (
-                    <div key={idx} className={`relative bg-white p-5 rounded-3xl border shadow-sm flex gap-4 transition-all duration-300 group ${isCompleted ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 hover:border-slate-300'}`}>
+                    <div 
+                      key={idx} 
+                      onClick={() => openSetLogModal(idx)}
+                      className={`relative bg-white p-5 rounded-3xl border shadow-sm flex gap-4 transition-all duration-300 cursor-pointer group hover:shadow-md ${isCompleted ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 hover:border-slate-300'}`}
+                    >
                       {/* Tombol Check/Selesai */}
-                      <button onClick={() => toggleExerciseCheck(idx)} className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center font-black text-lg transition-all duration-500 ${isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 rotate-[360deg] scale-105' : 'bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
+                      <button onClick={(e) => toggleExerciseCheck(idx, e)} className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center font-black text-lg transition-all duration-500 ${isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 rotate-[360deg] scale-105' : 'bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
                         {isCompleted ? <Check className="w-6 h-6 stroke-[3]" /> : idx + 1}
                       </button>
                       
                       <div className="flex-1 space-y-2.5 pr-8">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className={`font-extrabold text-base leading-tight transition-colors ${isCompleted ? 'text-slate-400 line-through decoration-slate-300' : 'text-[#111827]'}`}>{ex.name}</h3>
-                          <button onClick={() => setActiveDemo(ex)} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-[#FF5E00] text-[#FF5E00] hover:text-white rounded-xl text-[10px] font-extrabold transition-all border border-orange-100 shrink-0 uppercase tracking-wider">
+                          <button onClick={(e) => { e.stopPropagation(); setActiveDemo(ex); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-[#FF5E00] text-[#FF5E00] hover:text-white rounded-xl text-[10px] font-extrabold transition-all border border-orange-100 shrink-0 uppercase tracking-wider">
                             <Video className="w-3.5 h-3.5" /> Demo
                           </button>
                         </div>
@@ -481,9 +572,20 @@ export const WorkoutView: React.FC = () => {
                           <span className="bg-purple-50 text-purple-600 px-2.5 py-1 rounded-md border border-purple-100">{ex.rir || 'RIR 2'}</span>
                           <span className="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-md border border-slate-200 flex items-center gap-1"><Clock className="w-3 h-3" /> {ex.rest}</span>
                         </div>
+
+                        {/* Ringkasan Log Beban jika ada */}
+                        {hasLogs && (
+                          <div className="pt-1 flex flex-wrap gap-1.5 items-center">
+                            {currentLogs.map((s, sIdx) => (
+                              <span key={sIdx} className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${s.completed ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                S{sIdx + 1}: {s.weight || '0'}kg × {s.reps || '0'}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Tombol Aksi (Edit & Hapus) - Muncul saat dihover di desktop, selalu ada di mobile */}
+                      {/* Tombol Edit & Hapus */}
                       <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={(e) => openEditExercise(idx, e)} className="p-1.5 bg-slate-100 text-slate-500 hover:text-[#FF5E00] hover:bg-orange-50 rounded-lg transition-colors" title="Edit Gerakan"><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={(e) => handleDeleteExercise(idx, e)} className="p-1.5 bg-slate-100 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus Gerakan"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -493,12 +595,89 @@ export const WorkoutView: React.FC = () => {
                 })}
               </div>
               
-              {/* Tombol Tambah Gerakan */}
               <button onClick={openAddExercise} className="w-full mt-4 py-4 border-2 border-dashed border-slate-300 text-slate-500 hover:text-[#FF5E00] hover:border-[#FF5E00] hover:bg-orange-50/50 rounded-3xl font-black transition-all flex items-center justify-center gap-2 text-sm">
                 <Plus className="w-5 h-5" /> Tambah Gerakan Manual
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* --- MODAL PENCATATAN SET (BEBAN & REPS PER SET) --- */}
+      {isSetModalOpen && activeSetExerciseIdx !== null && activeWorkout?.exercises[activeSetExerciseIdx] && (
+        <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 relative shadow-2xl animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <span className="text-xs font-bold text-[#FF5E00] uppercase tracking-wider block">Catat Beban & Reps</span>
+                <h3 className="font-black text-[#111827] text-xl flex items-center gap-2">
+                  {activeWorkout.exercises[activeSetExerciseIdx].name}
+                </h3>
+              </div>
+              <button onClick={() => setIsSetModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* List Baris Set */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-12 gap-2 text-[11px] font-black uppercase text-slate-400 px-1">
+                <span className="col-span-2">Set</span>
+                <span className="col-span-4">Beban (kg)</span>
+                <span className="col-span-4">Reps</span>
+                <span className="col-span-2 text-center">Done</span>
+              </div>
+
+              {tempSets.map((s, idx) => (
+                <div key={idx} className={`grid grid-cols-12 gap-2 items-center p-2 rounded-2xl border transition-all ${s.completed ? 'bg-emerald-50/50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="col-span-2 font-black text-slate-700 text-sm flex items-center gap-1">
+                    <span className="w-6 h-6 rounded-lg bg-slate-200/60 flex items-center justify-center text-xs">{idx + 1}</span>
+                  </div>
+                  
+                  <div className="col-span-4">
+                    <input 
+                      type="number" 
+                      step="0.5"
+                      placeholder="kg"
+                      value={s.weight} 
+                      onChange={(e) => handleUpdateSetRow(idx, 'weight', e.target.value)} 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827] focus:outline-none focus:border-[#FF5E00]"
+                    />
+                  </div>
+
+                  <div className="col-span-4">
+                    <input 
+                      type="text" 
+                      placeholder="reps"
+                      value={s.reps} 
+                      onChange={(e) => handleUpdateSetRow(idx, 'reps', e.target.value)} 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827] focus:outline-none focus:border-[#FF5E00]"
+                    />
+                  </div>
+
+                  <div className="col-span-2 flex items-center justify-center gap-1">
+                    <button 
+                      onClick={() => handleUpdateSetRow(idx, 'completed', !s.completed)}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${s.completed ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-slate-300 text-slate-300 hover:text-slate-400'}`}
+                    >
+                      <Check className="w-4 h-4 stroke-[3]" />
+                    </button>
+                    {tempSets.length > 1 && (
+                      <button onClick={() => handleRemoveSetRow(idx)} className="text-slate-300 hover:text-red-500 p-1"><X className="w-3.5 h-3.5" /></button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={handleAddSetRow} className="w-full py-2.5 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-slate-500 hover:text-[#FF5E00] hover:border-[#FF5E00] transition-colors flex items-center justify-center gap-1">
+              <Plus className="w-4 h-4" /> Tambah Baris Set
+            </button>
+
+            <button onClick={handleSaveSetLogs} className="w-full bg-[#FF5E00] hover:bg-[#E05300] text-white py-4 rounded-2xl font-black text-sm transition-all shadow-lg shadow-orange-500/20">
+              Simpan Pencatatan
+            </button>
+          </div>
         </div>
       )}
 
@@ -552,7 +731,7 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* FLOAT TIMER & MODALS LAINNYA... (Kode ini tetap sama) */}
+      {/* FLOAT TIMER & MODALS LAINNYA */}
       {isWorkoutActive && (
         <div className={`fixed transition-all duration-500 ease-in-out ${isTimerMinimized ? 'bottom-28 sm:bottom-6 right-4 sm:right-6 z-[60]' : 'inset-0 z-[100] bg-[#111827]/80 backdrop-blur-sm flex items-center justify-center p-4'}`}>
           {!isTimerMinimized ? (
@@ -581,7 +760,6 @@ export const WorkoutView: React.FC = () => {
 
       {isRecapModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-4 overflow-y-auto">
-          {/* Card Rekap (Disembunyikan detailnya demi singkatnya teks, tapi kode utuh) */}
           <div id="strava-sticker-card" className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-2" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
             <div className="mb-4"><span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Workout</span><span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{activeWorkout?.name}</span></div>
             <div className="mb-4"><span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Time</span><span className="text-white font-black text-4xl tracking-tight block font-mono" style={textShadowStyle}>{formatTime(workoutStats.duration)}</span></div>
