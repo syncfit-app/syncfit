@@ -1,7 +1,7 @@
 // src/components/WeightInputModal.tsx
 import React, { useState } from 'react';
 import { X, Scale } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Path ini sudah sesuai dengan github_2.JPG
+import { supabase } from '../lib/supabase'; 
 
 interface WeightInputModalProps {
   isOpen: boolean;
@@ -22,10 +22,15 @@ export const WeightInputModal: React.FC<WeightInputModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Jika state isOpen false, modal tidak akan dirender
   if (!isOpen) return null;
 
   const handleSave = async () => {
+    // Validasi apabila userId kosong/bermasalah
+    if (!userId) {
+      setError('Sesi login tidak valid. Silakan muat ulang halaman.');
+      return;
+    }
+
     const numWeight = parseFloat(weight);
     
     // Validasi input
