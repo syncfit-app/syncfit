@@ -14,7 +14,7 @@ export const ProfileView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // ID pengguna sementara (akan diganti saat sistem Login sudah jadi)
-  const userId = "33c01b23-55d0-42d8-8f8b-b586df683696";
+  const userId = "33c01b23-55d0-42d8-8f8b-b5b3eea33366";
 
   // Mengambil data profil dari Supabase
   useEffect(() => {
