@@ -6,28 +6,24 @@ import { supabase } from '../lib/supabase';
 export const ProfileView: React.FC = () => {
   const [profileData, setProfileData] = useState<{
     full_name: string;
+    gender: string;
     age: number;
     weight_kg: number;
     height_cm: number;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Mengambil data profil dari Supabase secara otomatis berdasarkan user yang login
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        // Ambil data user yang sedang aktif (sama seperti di Onboarding)
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         
-        if (authError || !user) {
-          console.error('User belum login atau sesi habis.');
-          return;
-        }
+        if (authError || !user) return;
 
-        // Tarik data profil berdasarkan user.id yang dinamis
+        // Ditambahkan 'gender' ke dalam select query
         const { data, error } = await supabase
           .from('profiles')
-          .select('full_name, age, weight_kg, height_cm')
+          .select('full_name, gender, age, weight_kg, height_cm')
           .eq('id', user.id)
           .single();
 
@@ -50,7 +46,6 @@ export const ProfileView: React.FC = () => {
     return name ? name.charAt(0).toUpperCase() : '?';
   };
 
-  // Fungsi Logout yang berfungsi nyata
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.reload();
@@ -65,12 +60,10 @@ export const ProfileView: React.FC = () => {
   ];
 
   return (
-    // max-w-lg diubah ke max-w-5xl, ditambah md:grid untuk memisahkan kolom di desktop
     <div className="pt-4 pb-24 px-4 md:px-8 max-w-5xl mx-auto space-y-6 md:space-y-0 md:gap-8 md:grid md:grid-cols-12 font-sans animate-fade-in">
       
-      {/* BAGIAN KIRI / ATAS (Profil Utama & Logout) */}
+      {/* BAGIAN KIRI / ATAS */}
       <div className="md:col-span-4 space-y-6">
-        {/* KARTU PROFIL UTAMA (Warna Hitam) */}
         <div className="bg-[#111827] rounded-[2rem] p-8 flex flex-col items-center text-center shadow-xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-white/5 to-transparent"></div>
           
@@ -81,9 +74,17 @@ export const ProfileView: React.FC = () => {
               </span>
             </div>
             
-            <span className="bg-white/10 text-slate-300 text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-full backdrop-blur-sm">
-              Warrior Member
-            </span>
+            {/* BADGE MEMBERSHIP & GENDER */}
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className="bg-white/10 text-slate-300 text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-full backdrop-blur-sm">
+                Warrior Member
+              </span>
+              {profileData?.gender && (
+                <span className="bg-[#FF5E00]/20 text-[#FF5E00] border border-[#FF5E00]/30 text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-full backdrop-blur-sm">
+                  {profileData.gender === 'male' ? 'Laki-laki' : 'Perempuan'}
+                </span>
+              )}
+            </div>
             
             <h2 className="text-2xl font-black text-white mt-4 tracking-tight">
               {isLoading ? 'Memuat...' : profileData?.full_name || 'Pengguna'}
@@ -92,7 +93,6 @@ export const ProfileView: React.FC = () => {
           </div>
         </div>
 
-        {/* TOMBOL LOGOUT (Dipindah ke bawah kartu hitam pada mode desktop) */}
         <button 
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 p-4 text-red-500 bg-red-50 hover:bg-red-100 rounded-2xl font-bold transition-colors"
@@ -102,10 +102,8 @@ export const ProfileView: React.FC = () => {
         </button>
       </div>
 
-      {/* BAGIAN KANAN / BAWAH (Statistik & Menu) */}
+      {/* BAGIAN KANAN / BAWAH */}
       <div className="md:col-span-8 space-y-6">
-        
-        {/* GRID STATISTIK FISIK (Di HP 2 kolom, di Desktop 4 kolom) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] text-center transition-transform hover:-translate-y-1">
             <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Berat</p>
@@ -133,7 +131,6 @@ export const ProfileView: React.FC = () => {
           </div>
         </div>
 
-        {/* MENU PENGATURAN */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] overflow-hidden">
           {menuItems.map((item, index) => (
             <button 
