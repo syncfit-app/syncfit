@@ -4,7 +4,8 @@ import html2canvas from 'html2canvas';
 import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
-  Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download
+  Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download,
+  Edit2, Save
 } from 'lucide-react';
 
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
@@ -42,6 +43,10 @@ export const WorkoutView: React.FC = () => {
   const [activeDemo, setActiveDemo] = useState<GeneratedExercise | null>(null);
   const [isRecapModalOpen, setIsRecapModalOpen] = useState(false);
   const [workoutStats, setWorkoutStats] = useState({ duration: 0, calories: 0, date: '' });
+
+  // --- STATE EDIT NAMA PROGRAM ---
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempDayName, setTempDayName] = useState("");
 
   const hasActivePlan = activePlan.length > 0;
   const activeWorkout = activePlan[selectedDay];
@@ -144,6 +149,21 @@ export const WorkoutView: React.FC = () => {
 
     // Update periode minggu di Supabase
     await saveProgramToDB(formExp, formDays, formGoal, week, newPlan);
+  };
+
+  const handleSaveDayName = async () => {
+    if (!tempDayName.trim()) return;
+    
+    // 1. Update state lokal di layar
+    const updatedPlan = [...activePlan];
+    if (updatedPlan[selectedDay]) {
+      updatedPlan[selectedDay].name = tempDayName;
+    }
+    setActivePlan(updatedPlan);
+    setIsEditingName(false);
+
+    // 2. Simpan otomatis ke Supabase menggunakan fungsi yang sudah ada
+    await saveProgramToDB(formExp, formDays, formGoal, selectedWeek, updatedPlan);
   };
 
   const toggleExerciseCheck = (exerciseIndex: number) => {
@@ -306,9 +326,40 @@ export const WorkoutView: React.FC = () => {
                   </span>
                 </div>
                 
-                <h1 className="text-3xl sm:text-4xl font-black leading-tight text-white">
-                  {activeWorkout?.name}
-                </h1>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={tempDayName}
+                      onChange={(e) => setTempDayName(e.target.value)}
+                      className="bg-slate-800 text-white text-2xl sm:text-3xl font-black rounded-xl px-4 py-2 border border-slate-600 focus:outline-none focus:border-[#FF5E00] w-full max-w-[250px] sm:max-w-sm"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveDayName()}
+                    />
+                    <button onClick={handleSaveDayName} className="bg-[#FF5E00] hover:bg-[#E05300] text-white p-2.5 rounded-xl transition-all">
+                      <Save className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => setIsEditingName(false)} className="bg-slate-700 hover:bg-slate-600 text-white p-2.5 rounded-xl transition-all">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 group mt-1">
+                    <h1 className="text-3xl sm:text-4xl font-black leading-tight text-white">
+                      {activeWorkout?.name}
+                    </h1>
+                    <button 
+                      onClick={() => {
+                        setTempDayName(activeWorkout?.name || "");
+                        setIsEditingName(true);
+                      }}
+                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-slate-800 p-2 rounded-lg hover:text-[#FF5E00] text-slate-400 border border-slate-700"
+                      title="Edit Nama Latihan"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
                 
                 <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-400 mt-2">
                   <div className="flex items-center gap-1.5">
@@ -474,7 +525,7 @@ export const WorkoutView: React.FC = () => {
                         
                         <div className={`flex flex-wrap gap-2 text-[11px] font-bold ${isCompleted ? 'opacity-60' : ''}`}>
                           <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-100">{ex.sets} Sets</span>
-                          <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md border border-emerald-100">{ex.reps} Reps</span>
+                          <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md border border-emerald-100">{ex.reps}</span>
                           <span className="bg-purple-50 text-purple-600 px-2.5 py-1 rounded-md border border-purple-100">{ex.rir || 'RIR 2'}</span>
                           <span className="bg-slate-50 text-slate-600 px-2.5 py-1 rounded-md border border-slate-200 flex items-center gap-1">
                             <Clock className="w-3 h-3" /> {ex.rest}
