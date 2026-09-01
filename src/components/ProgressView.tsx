@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, Scale, Calendar, Award, Flame, Activity } from 'lucide-react';
 import WeightInputModal from './WeightInputModal';
-import { supabase } from '../lib/supabase'; // Import koneksi database
+import { supabase } from '../lib/supabase';
 
 interface ChartPoint {
   label: string;
@@ -34,18 +34,25 @@ export const ProgressView: React.FC = () => {
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [currentWeight, setCurrentWeight] = useState<number>(0);
   const [isLoadingWeight, setIsLoadingWeight] = useState(true);
+  
+  // State untuk menyimpan ID pengguna yang sedang login
+  const [activeUserId, setActiveUserId] = useState<string | null>(null);
 
-  // ID pengguna sementara
-  const userId = "33c01b23-55d0-42d8-8f8b-b586df683696"; 
-
-  // FUNGSI BARU: Mengambil berat badan dari Supabase saat komponen dimuat
+  // Mengambil data user yang sedang login beserta berat badannya
   useEffect(() => {
     const fetchWeight = async () => {
       try {
+        // Ambil data user yang sedang aktif
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) return;
+        
+        setActiveUserId(user.id);
+
+        // Ambil data berat badan dari Supabase
         const { data, error } = await supabase
           .from('profiles')
           .select('weight_kg')
-          .eq('id', userId)
+          .eq('id', user.id)
           .single();
 
         if (error) throw error;
@@ -61,7 +68,7 @@ export const ProgressView: React.FC = () => {
     };
 
     fetchWeight();
-  }, []); // Array kosong memastikan fetch hanya berjalan sekali saat halaman dibuka
+  }, []); 
 
   const prs = [
     { exercise: 'Bench Press', record: '95 kg', date: '12 Aug 2026' },
@@ -146,7 +153,6 @@ export const ProgressView: React.FC = () => {
             <span className="text-[11px] text-slate-400 font-extrabold uppercase tracking-wider block mb-1">
               Berat Badan <span className="text-[9px] text-[#FF5E00] ml-1 bg-orange-100 px-1.5 py-0.5 rounded">(Ketuk untuk Edit)</span>
             </span>
-            {/* Animasi teks saat loading */}
             <p className="text-3xl font-black text-[#111827] tracking-tight mt-1">
               {isLoadingWeight ? '...' : currentWeight} <span className="text-sm font-bold text-slate-400">kg</span>
             </p>
@@ -319,13 +325,16 @@ export const ProgressView: React.FC = () => {
         </div>
       </div>
 
-      <WeightInputModal 
-        isOpen={isWeightModalOpen}
-        onClose={() => setIsWeightModalOpen(false)}
-        userId={userId} 
-        currentWeight={currentWeight}
-        onSuccess={(newWeight) => setCurrentWeight(newWeight)}
-      />
+      {/* Teruskan activeUserId (jika sudah ada) ke dalam WeightInputModal */}
+      {activeUserId && (
+        <WeightInputModal 
+          isOpen={isWeightModalOpen}
+          onClose={() => setIsWeightModalOpen(false)}
+          userId={activeUserId} 
+          currentWeight={currentWeight}
+          onSuccess={(newWeight) => setCurrentWeight(newWeight)}
+        />
+      )}
     </div>
   );
 };
