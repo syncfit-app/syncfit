@@ -1,7 +1,8 @@
 // src/components/ProgressView.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, Scale, Calendar, Award, Flame, Activity } from 'lucide-react';
-import WeightInputModal from './WeightInputModal'; // Import komponen modal baru
+import WeightInputModal from './WeightInputModal';
+import { supabase } from '../lib/supabase'; // Import koneksi database
 
 interface ChartPoint {
   label: string;
@@ -30,9 +31,37 @@ export const ProgressView: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'Weekly' | 'Monthly'>('Weekly');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   
-  // STATE BARU: Untuk mengontrol modal dan menyimpan angka berat badan sementara di UI
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
-  const [currentWeight, setCurrentWeight] = useState(72.5); // Angka awal sesuai desain
+  const [currentWeight, setCurrentWeight] = useState<number>(0);
+  const [isLoadingWeight, setIsLoadingWeight] = useState(true);
+
+  // ID pengguna sementara
+  const userId = "33c01b23-55d0-42d8-8f8b-b586df683696"; 
+
+  // FUNGSI BARU: Mengambil berat badan dari Supabase saat komponen dimuat
+  useEffect(() => {
+    const fetchWeight = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('weight_kg')
+          .eq('id', userId)
+          .single();
+
+        if (error) throw error;
+        
+        if (data && data.weight_kg) {
+          setCurrentWeight(data.weight_kg);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil data berat badan:", error);
+      } finally {
+        setIsLoadingWeight(false);
+      }
+    };
+
+    fetchWeight();
+  }, []); // Array kosong memastikan fetch hanya berjalan sekali saat halaman dibuka
 
   const prs = [
     { exercise: 'Bench Press', record: '95 kg', date: '12 Aug 2026' },
@@ -106,7 +135,6 @@ export const ProgressView: React.FC = () => {
       `}</style>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* KARTU BERAT BADAN (Ditambah kursor pointer & onClick) */}
         <div 
           onClick={() => setIsWeightModalOpen(true)}
           className="bg-white p-6 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center gap-5 transition-transform hover:scale-[1.02] cursor-pointer"
@@ -118,8 +146,10 @@ export const ProgressView: React.FC = () => {
             <span className="text-[11px] text-slate-400 font-extrabold uppercase tracking-wider block mb-1">
               Berat Badan <span className="text-[9px] text-[#FF5E00] ml-1 bg-orange-100 px-1.5 py-0.5 rounded">(Ketuk untuk Edit)</span>
             </span>
-            {/* Teks berat badan sekarang dinamis menggunakan variabel {currentWeight} */}
-            <p className="text-3xl font-black text-[#111827] tracking-tight mt-1">{currentWeight} <span className="text-sm font-bold text-slate-400">kg</span></p>
+            {/* Animasi teks saat loading */}
+            <p className="text-3xl font-black text-[#111827] tracking-tight mt-1">
+              {isLoadingWeight ? '...' : currentWeight} <span className="text-sm font-bold text-slate-400">kg</span>
+            </p>
             <span className="text-[11px] text-emerald-500 font-bold flex items-center gap-1 mt-1 bg-emerald-50 w-fit px-2 py-0.5 rounded-md">
               <TrendingUp className="w-3 h-3" /> -1.2 kg bulan ini
             </span>
@@ -289,13 +319,10 @@ export const ProgressView: React.FC = () => {
         </div>
       </div>
 
-      {/* RENDER KOMPONEN MODAL DI SINI */}
       <WeightInputModal 
         isOpen={isWeightModalOpen}
         onClose={() => setIsWeightModalOpen(false)}
-        // Catatan: Ganti string userId di bawah dengan ID Supabase kamu nanti saat Authentication sudah jalan. 
-        // Sementara saya isikan ID yang terlihat di screenshot kamu sebelumnya.
-        userId="33c01b23-55d0-42d8-8f8b-b586df683696" 
+        userId={userId} 
         currentWeight={currentWeight}
         onSuccess={(newWeight) => setCurrentWeight(newWeight)}
       />
