@@ -179,7 +179,6 @@ export const WorkoutView: React.FC = () => {
       setTempSets([...existingLogs]);
     } else {
       const defaultSetsCount = targetExercise.sets || 3;
-      // Perbaikan bug 812: Default reps dikosongkan agar user mengisi aktual yang dicapai
       const initial: SetDetail[] = Array.from({ length: defaultSetsCount }, () => ({
         weight: '',
         reps: '', 
@@ -207,10 +206,24 @@ export const WorkoutView: React.FC = () => {
     setTempSets(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const handleSaveSetLogs = () => {
+  const handleSaveSetLogs = async () => {
     if (activeSetExerciseIdx === null) return;
     const logKey = `${selectedDay}-${activeSetExerciseIdx}`;
+    
+    // 1. Simpan pencatatan baris lokal
     setExerciseSetLogs(prev => ({ ...prev, [logKey]: tempSets }));
+    
+    // 2. Sinkronisasi jumlah sets di program utama agar card ikut ter-update
+    const updatedPlan = [...activePlan];
+    if (updatedPlan[selectedDay] && updatedPlan[selectedDay].exercises[activeSetExerciseIdx]) {
+      updatedPlan[selectedDay].exercises[activeSetExerciseIdx].sets = tempSets.length;
+    }
+    setActivePlan(updatedPlan);
+    
+    // 3. Simpan perubahan struktur plan ke cloud
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, updatedPlan);
+
+    // 4. Update status completed exercise (centang biru di card)
     const isAllSetsDone = tempSets.length > 0 && tempSets.every(s => s.completed);
     setCompletedExercises(prev => {
       const dayCompleted = prev[selectedDay] || [];
@@ -219,6 +232,7 @@ export const WorkoutView: React.FC = () => {
       else if (!isAllSetsDone && hasIdx) { return { ...prev, [selectedDay]: dayCompleted.filter(i => i !== activeSetExerciseIdx) }; }
       return prev;
     });
+    
     setIsSetModalOpen(false);
   };
 
@@ -260,12 +274,11 @@ export const WorkoutView: React.FC = () => {
           duration_seconds: timer, calories_burned: calculatedCalories, exercises_completed: completedExerciseNames
         });
 
-        // 2. Simpan Data Reps & Beban ke exercise_logs (Opsi 2: Relasional)
+        // 2. Simpan Data Reps & Beban ke exercise_logs
         const setLogsToInsert: any[] = [];
         
         Object.keys(exerciseSetLogs).forEach(key => {
           const [dayIdx, exIdx] = key.split('-');
-          // Hanya simpan log untuk hari latihan yang sedang berjalan ini
           if (parseInt(dayIdx) === selectedDay) {
             const exerciseName = activeWorkout?.exercises[parseInt(exIdx)]?.name || 'Unknown Exercise';
             const setsData = exerciseSetLogs[key];
@@ -276,7 +289,7 @@ export const WorkoutView: React.FC = () => {
                   user_id: user.id,
                   exercise_key: exerciseName,
                   set_number: idx + 1,
-                  reps_achieved: parseInt(set.reps) || 0, // Aman karena field sudah string kosong / angka
+                  reps_achieved: parseInt(set.reps) || 0,
                   weight_kg: parseFloat(set.weight) || 0
                 });
               }
@@ -319,8 +332,6 @@ export const WorkoutView: React.FC = () => {
       link.click();
     } catch (e) { console.error(e); }
   };
-
-  const textShadowStyle = { textShadow: '0px 2px 10px rgba(0,0,0,0.9), 0px 1px 3px rgba(0,0,0,1)' };
 
   if (isLoading) return <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4"><div className="w-12 h-12 border-4 border-slate-200 border-t-[#FF5E00] rounded-full animate-spin"></div></div>;
 
@@ -402,7 +413,6 @@ export const WorkoutView: React.FC = () => {
                       <div className="flex-1 space-y-2.5 pr-8">
                         <div className="flex items-start justify-between gap-2">
                           <h3 className={`font-extrabold text-base leading-tight ${isCompleted ? 'text-slate-400 line-through' : 'text-[#111827]'}`}>{ex.name}</h3>
-                          {/* LOGIKA KONDISIONAL VIDEO DEMO */}
                           {ex.videoUrl && ex.videoUrl.trim() !== '' && (
                             <button onClick={(e) => { e.stopPropagation(); setActiveDemo(ex); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-[#FF5E00] rounded-xl text-[10px] font-extrabold uppercase shrink-0">
                               <Video className="w-3.5 h-3.5" /> Demo
@@ -447,7 +457,7 @@ export const WorkoutView: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 relative shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div><span className="text-xs font-bold text-[#FF5E00] uppercase block">Catat Beban & Reps</span><h3 className="font-black text-[#111827] text-xl">{activeWorkout.exercises[activeSetExerciseIdx].name}</h3></div>
-              <button onClick={() => setIsSetModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600"><X className="w-4 h-4" /></button>
+              <button onClick={() => setIsSetModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center transition-colors hover:bg-slate-200"><X className="w-4 h-4" /></button>
             </div>
 
             <div className="space-y-3">
@@ -467,7 +477,7 @@ export const WorkoutView: React.FC = () => {
               ))}
             </div>
             <button onClick={handleAddSetRow} className="w-full py-2.5 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-slate-500"><Plus className="w-4 h-4 inline" /> Tambah Baris Set</button>
-            <button onClick={handleSaveSetLogs} className="w-full bg-[#FF5E00] text-white py-4 rounded-2xl font-black">Simpan Pencatatan</button>
+            <button onClick={handleSaveSetLogs} className="w-full bg-[#FF5E00] hover:bg-[#E05300] transition-colors text-white py-4 rounded-2xl font-black shadow-lg shadow-orange-500/20">Simpan Pencatatan</button>
           </div>
         </div>
       )}
@@ -475,9 +485,8 @@ export const WorkoutView: React.FC = () => {
       {/* MODAL EDIT GERAKAN */}
       {isExerciseModalOpen && (
         <div className="fixed inset-0 bg-[#111827]/80 z-[110] flex items-center justify-center p-4">
-           {/* ... Bagian Form Edit Gerakan (Sudah ada dari kodemu, tidak diubah logic utamanya) ... */}
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6">
-            <div className="flex justify-between border-b pb-4"><h3 className="font-black text-lg">Edit Gerakan</h3><button onClick={() => setIsExerciseModalOpen(false)}><X className="w-4 h-4" /></button></div>
+            <div className="flex justify-between border-b pb-4"><h3 className="font-black text-lg">Edit Gerakan</h3><button onClick={() => setIsExerciseModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center"><X className="w-4 h-4" /></button></div>
             <div className="space-y-4">
               <div><label className="text-xs font-bold text-slate-500">Nama</label><input type="text" value={exerciseForm.name} onChange={(e) => setExerciseForm({...exerciseForm, name: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3" /></div>
               <div className="grid grid-cols-2 gap-4">
@@ -494,9 +503,8 @@ export const WorkoutView: React.FC = () => {
       {isConfigModalOpen && (
         <div className="fixed inset-0 bg-[#111827]/80 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6">
-             <div className="flex justify-between border-b pb-4"><h3 className="font-black text-lg">Konfigurasi</h3><button onClick={() => setIsConfigModalOpen(false)}><X className="w-4 h-4" /></button></div>
+             <div className="flex justify-between border-b pb-4"><h3 className="font-black text-lg">Konfigurasi</h3><button onClick={() => setIsConfigModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center"><X className="w-4 h-4" /></button></div>
              <div className="space-y-4">
-               {/* ... Opsi Experience, Days, Goal ... */}
                <div className="space-y-2"><label className="text-xs font-extrabold text-slate-400">Pengalaman</label><div className="grid grid-cols-3 gap-2">{(['Pemula', 'Menengah', 'Mahir'] as Experience[]).map((lvl) => (<button key={lvl} onClick={() => setFormExp(lvl)} className={`py-2 px-1 text-xs font-bold rounded-xl border ${formExp === lvl ? 'bg-[#111827] text-white' : 'bg-white'}`}>{lvl}</button>))}</div></div>
              </div>
              <button onClick={handleGeneratePlan} className="w-full bg-[#111827] text-white py-4 rounded-2xl font-black">Rancang Ulang</button>
@@ -508,11 +516,11 @@ export const WorkoutView: React.FC = () => {
       {activeDemo && (
         <div className="fixed inset-0 bg-[#111827]/80 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex justify-between"><h3 className="font-extrabold text-base">{activeDemo.name}</h3><button onClick={() => setActiveDemo(null)}><X className="w-4 h-4" /></button></div>
+            <div className="flex justify-between items-center"><h3 className="font-extrabold text-base">{activeDemo.name}</h3><button onClick={() => setActiveDemo(null)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center"><X className="w-4 h-4" /></button></div>
             <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center">
               <iframe className="w-full h-full" src={activeDemo.videoUrl} title="Demo" allowFullScreen />
             </div>
-            <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl">{activeDemo.note}</p>
+            {activeDemo.note && <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl">{activeDemo.note}</p>}
           </div>
         </div>
       )}
@@ -541,7 +549,6 @@ export const WorkoutView: React.FC = () => {
       {/* RECAP MODAL */}
       {isRecapModalOpen && (
         <div className="fixed inset-0 bg-black/90 z-[120] flex flex-col items-center justify-center p-4">
-           {/* ... UI Kartu Strava Recap ... */}
            <div id="strava-sticker-card" className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6">
               <span className="text-white font-black text-3xl mb-4">{activeWorkout?.name}</span>
               <span className="text-white font-black text-4xl mb-4 font-mono">{formatTime(workoutStats.duration)}</span>
