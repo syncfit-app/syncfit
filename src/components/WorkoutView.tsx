@@ -210,20 +210,16 @@ export const WorkoutView: React.FC = () => {
     if (activeSetExerciseIdx === null) return;
     const logKey = `${selectedDay}-${activeSetExerciseIdx}`;
     
-    // 1. Simpan pencatatan baris lokal
     setExerciseSetLogs(prev => ({ ...prev, [logKey]: tempSets }));
     
-    // 2. Sinkronisasi jumlah sets di program utama agar card ikut ter-update
     const updatedPlan = [...activePlan];
     if (updatedPlan[selectedDay] && updatedPlan[selectedDay].exercises[activeSetExerciseIdx]) {
       updatedPlan[selectedDay].exercises[activeSetExerciseIdx].sets = tempSets.length;
     }
     setActivePlan(updatedPlan);
     
-    // 3. Simpan perubahan struktur plan ke cloud
     await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, updatedPlan);
 
-    // 4. Update status completed exercise (centang biru di card)
     const isAllSetsDone = tempSets.length > 0 && tempSets.every(s => s.completed);
     setCompletedExercises(prev => {
       const dayCompleted = prev[selectedDay] || [];
@@ -353,6 +349,7 @@ export const WorkoutView: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="bg-[#FF5E00]/20 border border-[#FF5E00]/40 px-3 py-1 rounded-full text-[10px] sm:text-xs font-black text-[#FF5E00] uppercase tracking-wider">Minggu {selectedWeek}</span>
                   <span className="bg-slate-800 border border-slate-700 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider">{formExp}</span>
+                  <span className="bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-indigo-300 uppercase tracking-wider">{formGoal}</span>
                 </div>
                 {isEditingName ? (
                   <div className="flex items-center gap-2 mt-1">
@@ -375,6 +372,23 @@ export const WorkoutView: React.FC = () => {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* WEEK SELECTOR */}
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar">
+            {[1, 2, 3, 4].map((w) => (
+              <button
+                key={w}
+                onClick={() => handleWeekChange(w)}
+                className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all border ${
+                  selectedWeek === w
+                    ? 'bg-[#111827] text-white border-[#111827] shadow-md'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                Minggu {w}
+              </button>
+            ))}
           </div>
 
           {/* JADWAL */}
