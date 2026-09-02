@@ -329,6 +329,8 @@ export const WorkoutView: React.FC = () => {
     } catch (e) { console.error(e); }
   };
 
+  const textShadowStyle = { textShadow: '0px 2px 10px rgba(0,0,0,0.9), 0px 1px 3px rgba(0,0,0,1)' };
+
   if (isLoading) return <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4"><div className="w-12 h-12 border-4 border-slate-200 border-t-[#FF5E00] rounded-full animate-spin"></div></div>;
 
   return (
@@ -367,28 +369,41 @@ export const WorkoutView: React.FC = () => {
                 <button onClick={() => setIsConfigModalOpen(true)} className="bg-slate-800 text-slate-200 p-3.5 rounded-xl font-bold border border-slate-700 shrink-0"><Settings2 className="w-5 h-5" /></button>
                 {activeWorkout?.type !== 'Rest' && (
                   <button onClick={handleStartSession} disabled={isWorkoutActive} className={`w-full md:w-auto py-3.5 px-6 rounded-xl font-black flex items-center justify-center gap-2 ${isWorkoutActive ? 'bg-slate-800 text-slate-500 border border-slate-700' : 'bg-[#FF5E00] text-white hover:scale-105'}`}>
-                    {isWorkoutActive ? <><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Sesi Berjalan</span></> : <><Play className="w-5 h-5" /><span>Mulai Latihan</span></>}
+                    {isWorkoutActive ? <><span className="w-2 h-2 rounded-full bg-emerald-50 animate-pulse"></span><span>Sesi Berjalan</span></> : <><Play className="w-5 h-5" /><span>Mulai Latihan</span></>}
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* WEEK SELECTOR */}
-          <div className="flex gap-2 overflow-x-auto hide-scrollbar">
-            {[1, 2, 3, 4].map((w) => (
-              <button
-                key={w}
-                onClick={() => handleWeekChange(w)}
-                className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all border ${
-                  selectedWeek === w
-                    ? 'bg-[#111827] text-white border-[#111827] shadow-md'
-                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                Minggu {w}
-              </button>
-            ))}
+          {/* WEEK SELECTOR / PERIODISASI MINGGUAN */}
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2">
+                <Zap className="w-4 h-4 text-[#FF5E00]" />
+                Fase Periodisasi
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { w: 1, label: 'W1: Pondasi' },
+                { w: 2, label: 'W2: Volume' },
+                { w: 3, label: 'W3: Intensitas' },
+                { w: 4, label: 'W4: Deload' }
+              ].map((item) => (
+                <button
+                  key={item.w}
+                  onClick={() => handleWeekChange(item.w)}
+                  className={`py-3 px-2 text-[11px] sm:text-xs font-black rounded-xl border transition-all duration-300 ${
+                    selectedWeek === item.w
+                      ? 'bg-[#FF5E00] text-white border-[#FF5E00] shadow-md shadow-orange-500/20 scale-[1.02]'
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* JADWAL */}
@@ -398,9 +413,9 @@ export const WorkoutView: React.FC = () => {
               {activePlan.map((item, index) => {
                 const isActive = selectedDay === index;
                 return (
-                  <button key={index} onClick={() => setSelectedDay(index)} className={`flex flex-col items-center justify-center py-3 rounded-xl transition-all border ${isActive ? 'bg-[#111827] text-white border-[#111827] scale-110 shadow-lg' : 'bg-white text-slate-500'}`}>
+                  <button key={index} onClick={() => setSelectedDay(index)} className={`flex flex-col items-center justify-center py-3 rounded-xl transition-all border ${isActive ? 'bg-[#111827] text-white border-[#111827] scale-110 shadow-lg z-10' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
                     <span className={`text-[10px] font-black uppercase ${isActive ? 'text-[#FF5E00]' : 'text-slate-400'}`}>D{index + 1}</span>
-                    <span className="text-[10px] sm:text-xs font-bold truncate w-full px-1 text-center mt-0.5">{item.name === 'Rest Day' ? 'Rest' : item.name}</span>
+                    <span className={`text-[10px] sm:text-xs font-bold truncate w-full px-1 text-center mt-0.5 ${isActive ? 'text-white' : 'text-slate-700'}`}>{item.name === 'Rest Day' ? 'Rest' : item.name}</span>
                   </button>
                 );
               })}
@@ -419,8 +434,8 @@ export const WorkoutView: React.FC = () => {
                   const hasLogs = currentLogs.some(s => s.weight || s.completed);
 
                   return (
-                    <div key={idx} onClick={() => openSetLogModal(idx)} className={`relative bg-white p-5 rounded-3xl border shadow-sm flex gap-4 cursor-pointer group hover:shadow-md ${isCompleted ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100'}`}>
-                      <button onClick={(e) => toggleExerciseCheck(idx, e)} className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center font-black transition-all ${isCompleted ? 'bg-emerald-500 text-white scale-105' : 'bg-slate-50 text-slate-400'}`}>
+                    <div key={idx} onClick={() => openSetLogModal(idx)} className={`relative bg-white p-5 rounded-3xl border shadow-sm flex gap-4 cursor-pointer group hover:shadow-md transition-all ${isCompleted ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 hover:border-slate-300'}`}>
+                      <button onClick={(e) => toggleExerciseCheck(idx, e)} className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center font-black transition-all ${isCompleted ? 'bg-emerald-500 text-white scale-105' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>
                         {isCompleted ? <Check className="w-6 h-6" /> : idx + 1}
                       </button>
                       
@@ -428,22 +443,22 @@ export const WorkoutView: React.FC = () => {
                         <div className="flex items-start justify-between gap-2">
                           <h3 className={`font-extrabold text-base leading-tight ${isCompleted ? 'text-slate-400 line-through' : 'text-[#111827]'}`}>{ex.name}</h3>
                           {ex.videoUrl && ex.videoUrl.trim() !== '' && (
-                            <button onClick={(e) => { e.stopPropagation(); setActiveDemo(ex); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-[#FF5E00] rounded-xl text-[10px] font-extrabold uppercase shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); setActiveDemo(ex); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-[#FF5E00] hover:bg-[#FF5E00] hover:text-white transition-all rounded-xl text-[10px] font-extrabold uppercase shrink-0 border border-orange-100">
                               <Video className="w-3.5 h-3.5" /> Demo
                             </button>
                           )}
                         </div>
                         
                         <div className={`flex flex-wrap gap-2 text-[11px] font-bold ${isCompleted ? 'opacity-60' : ''}`}>
-                          <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md">{ex.sets} Sets</span>
-                          <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md">{ex.reps}</span>
-                          <span className="bg-purple-50 text-purple-600 px-2.5 py-1 rounded-md">{ex.rir || 'RIR 2'}</span>
+                          <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-100">{ex.sets} Sets</span>
+                          <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md border border-emerald-100">{ex.reps}</span>
+                          <span className="bg-purple-50 text-purple-600 px-2.5 py-1 rounded-md border border-purple-100">{ex.rir || 'RIR 2'}</span>
                         </div>
 
                         {hasLogs && (
                           <div className="pt-1 flex flex-wrap gap-1.5 items-center">
                             {currentLogs.map((s, sIdx) => (
-                              <span key={sIdx} className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${s.completed ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600'}`}>
+                              <span key={sIdx} className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${s.completed ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                                 S{sIdx + 1}: {s.weight || '0'}kg × {s.reps || '0'}
                               </span>
                             ))}
@@ -451,7 +466,7 @@ export const WorkoutView: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-100 md:opacity-0 group-hover:opacity-100">
+                      <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={(e) => openEditExercise(idx, e)} className="p-1.5 bg-slate-100 text-slate-500 rounded-lg hover:text-[#FF5E00]"><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={(e) => handleDeleteExercise(idx, e)} className="p-1.5 bg-slate-100 text-slate-500 rounded-lg hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
@@ -459,7 +474,7 @@ export const WorkoutView: React.FC = () => {
                   )
                 })}
               </div>
-              <button onClick={openAddExercise} className="w-full mt-4 py-4 border-2 border-dashed border-slate-300 text-slate-500 hover:text-[#FF5E00] hover:border-[#FF5E00] rounded-3xl font-black flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> Tambah Gerakan Manual</button>
+              <button onClick={openAddExercise} className="w-full mt-4 py-4 border-2 border-dashed border-slate-300 text-slate-500 hover:text-[#FF5E00] hover:border-[#FF5E00] transition-all rounded-3xl font-black flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> Tambah Gerakan Manual</button>
             </div>
           )}
         </div>
@@ -515,13 +530,50 @@ export const WorkoutView: React.FC = () => {
       
       {/* MODAL CONFIG */}
       {isConfigModalOpen && (
-        <div className="fixed inset-0 bg-[#111827]/80 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6">
-             <div className="flex justify-between border-b pb-4"><h3 className="font-black text-lg">Konfigurasi</h3><button onClick={() => setIsConfigModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center"><X className="w-4 h-4" /></button></div>
-             <div className="space-y-4">
-               <div className="space-y-2"><label className="text-xs font-extrabold text-slate-400">Pengalaman</label><div className="grid grid-cols-3 gap-2">{(['Pemula', 'Menengah', 'Mahir'] as Experience[]).map((lvl) => (<button key={lvl} onClick={() => setFormExp(lvl)} className={`py-2 px-1 text-xs font-bold rounded-xl border ${formExp === lvl ? 'bg-[#111827] text-white' : 'bg-white'}`}>{lvl}</button>))}</div></div>
+        <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
+             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2 text-[#FF5E00]">
+                  <Wand2 className="w-6 h-6" />
+                  <h3 className="font-black text-[#111827] text-lg">Konfigurasi Program</h3>
+                </div>
+                <button onClick={() => setIsConfigModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
+                  <X className="w-4 h-4" />
+                </button>
              </div>
-             <button onClick={handleGeneratePlan} className="w-full bg-[#111827] text-white py-4 rounded-2xl font-black">Rancang Ulang</button>
+             
+             <div className="space-y-4">
+               <div className="space-y-2">
+                 <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Pengalaman</label>
+                 <div className="grid grid-cols-3 gap-2">
+                   {(['Pemula', 'Menengah', 'Mahir'] as Experience[]).map((lvl) => (
+                     <button key={lvl} onClick={() => setFormExp(lvl)} className={`py-2.5 px-1 text-xs font-bold rounded-xl border transition-all ${formExp === lvl ? 'bg-[#111827] text-white border-[#111827]' : 'bg-white text-slate-500 border-slate-200'}`}>{lvl}</button>
+                   ))}
+                 </div>
+               </div>
+
+               <div className="space-y-2">
+                 <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Hari per Minggu</label>
+                 <div className="grid grid-cols-5 gap-2">
+                   {[2, 3, 4, 5, 6].map((day) => (
+                     <button key={day} onClick={() => setFormDays(day)} className={`py-2.5 px-1 text-sm font-black rounded-xl border transition-all ${formDays === day ? 'bg-[#111827] text-white border-[#111827]' : 'bg-white text-slate-500 border-slate-200'}`}>{day}</button>
+                   ))}
+                 </div>
+               </div>
+
+               <div className="space-y-2">
+                 <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Target Utama</label>
+                 <div className="grid grid-cols-2 gap-2">
+                   {(['Hypertrophy', 'Strength', 'Fat Loss', 'General Fitness'] as Goal[]).map((gl) => (
+                     <button key={gl} onClick={() => setFormGoal(gl)} className={`py-3 px-2 text-xs font-bold rounded-xl border transition-all ${formGoal === gl ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'}`}>{gl}</button>
+                   ))}
+                 </div>
+               </div>
+             </div>
+
+             <button onClick={handleGeneratePlan} className="w-full bg-[#111827] hover:bg-slate-800 text-white py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 mt-2">
+               Simpan & Rancang Jadwal
+             </button>
           </div>
         </div>
       )}
@@ -552,7 +604,7 @@ export const WorkoutView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div onClick={() => setIsTimerMinimized(false)} className="bg-[#111827] text-white px-5 py-3.5 rounded-full flex items-center gap-4 cursor-pointer">
+            <div onClick={() => setIsTimerMinimized(false)} className="bg-[#111827] text-white px-5 py-3.5 rounded-full flex items-center gap-4 cursor-pointer hover:bg-slate-800 transition-all shadow-xl">
               <span className="font-mono font-bold text-lg">{formatTime(timer)}</span>
               <Minimize2 className="w-4 h-4 text-slate-400 rotate-180" />
             </div>
@@ -562,14 +614,49 @@ export const WorkoutView: React.FC = () => {
 
       {/* RECAP MODAL */}
       {isRecapModalOpen && (
-        <div className="fixed inset-0 bg-black/90 z-[120] flex flex-col items-center justify-center p-4">
-           <div id="strava-sticker-card" className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6">
-              <span className="text-white font-black text-3xl mb-4">{activeWorkout?.name}</span>
-              <span className="text-white font-black text-4xl mb-4 font-mono">{formatTime(workoutStats.duration)}</span>
-           </div>
-           <div className="flex flex-row gap-3 w-full max-w-sm px-4">
-            <button onClick={() => setIsRecapModalOpen(false)} className="flex-none py-4 px-6 bg-slate-800 rounded-2xl text-white font-bold">Tutup</button>
-            <button onClick={downloadRecapPNG} className="flex-1 py-4 bg-[#FF5E00] rounded-2xl text-white font-black">Simpan Stiker</button>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-4 overflow-y-auto">
+          <div 
+            id="strava-sticker-card" 
+            className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-2"
+            style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+          >
+            <div className="mb-4">
+              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Workout</span>
+              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{activeWorkout?.name}</span>
+            </div>
+            <div className="mb-4">
+              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Time</span>
+              <span className="text-white font-black text-4xl tracking-tight block font-mono" style={textShadowStyle}>{formatTime(workoutStats.duration)}</span>
+            </div>
+            <div className="mb-4">
+              <span className="text-[#FF5E00] text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Calories</span>
+              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{workoutStats.calories} <span className="text-lg font-bold text-white/90">kcal</span></span>
+            </div>
+            {completedExercises[selectedDay] && completedExercises[selectedDay].length > 0 && (
+              <div className="w-full flex flex-col items-center mb-3">
+                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-2" style={textShadowStyle}>Exercises Completed</span>
+                <div className="flex flex-col items-center gap-1.5 w-full px-2">
+                  {completedExercises[selectedDay].map(idx => (
+                    <span key={idx} className="text-[13.5px] sm:text-sm font-bold text-white text-center leading-tight tracking-wide" style={textShadowStyle}>
+                      {activeWorkout?.exercises[idx]?.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="mt-1 mb-1 flex justify-center">
+              <img src="/dumbble.png" alt="Dumbbell Icon" className="w-24 h-24 object-contain bg-transparent drop-shadow-md" />
+            </div>
+            <div className="flex items-center justify-center mt-2 mb-1">
+              <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>SYNC<span className="text-[#FF5E00]">FIT</span></span>
+            </div>
+          </div>
+
+          <div className="flex flex-row gap-3 w-full max-w-sm px-4">
+            <button onClick={() => setIsRecapModalOpen(false)} className="flex-none py-4 px-6 bg-slate-800 hover:bg-slate-700 transition-colors rounded-2xl text-white font-bold">Tutup</button>
+            <button onClick={downloadRecapPNG} className="flex-1 py-4 bg-[#FF5E00] hover:bg-[#E05300] transition-colors rounded-2xl text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
+              <Download className="w-5 h-5" /> Simpan Stiker
+            </button>
           </div>
         </div>
       )}
