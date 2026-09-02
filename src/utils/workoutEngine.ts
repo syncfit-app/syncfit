@@ -152,28 +152,39 @@ export const generateWorkoutPlan = (exp: Experience, days: number, goal: Goal, w
   };
 
   const getExercises = (pool: GeneratedExercise[], count: number) => pool.slice(0, count);
+  const getRestDay = (): DayPlan => ({ name: 'Rest Day', type: 'Rest', exercises: [] });
 
-  // 4. Pembagian Menu Latihan Berdasarkan Jumlah "Hari per Minggu"
+  // 4. Pembagian Menu Latihan dengan Distribusi Rest Day yang Proporsional
   if (days === 1) {
     plan.push({ name: 'Full Body Day', type: 'Workout', exercises: applyPeriodization(getExercises(getFullBodyPool('A'), exerciseCount)) });
+    plan.push(getRestDay(), getRestDay(), getRestDay(), getRestDay(), getRestDay(), getRestDay());
   } else if (days === 2) {
     plan.push({ name: 'Upper Body', type: 'Workout', exercises: applyPeriodization(getExercises(getUpperPool(), exerciseCount)) });
+    plan.push(getRestDay(), getRestDay());
     plan.push({ name: 'Lower Body', type: 'Workout', exercises: applyPeriodization(getExercises(getLowerPool(), exerciseCount)) });
+    plan.push(getRestDay(), getRestDay(), getRestDay());
   } else if (days === 3) {
     plan.push({ name: 'Full Body A', type: 'Workout', exercises: applyPeriodization(getExercises(getFullBodyPool('A'), exerciseCount)) });
+    plan.push(getRestDay());
     plan.push({ name: 'Full Body B', type: 'Workout', exercises: applyPeriodization(getExercises(getFullBodyPool('B'), exerciseCount)) });
+    plan.push(getRestDay());
     plan.push({ name: 'Full Body C', type: 'Workout', exercises: applyPeriodization(getExercises(getFullBodyPool('C'), exerciseCount)) });
+    plan.push(getRestDay(), getRestDay());
   } else if (days === 4) {
     plan.push({ name: 'Upper Body A', type: 'Workout', exercises: applyPeriodization(getExercises(getUpperPool(), exerciseCount)) });
     plan.push({ name: 'Lower Body A', type: 'Workout', exercises: applyPeriodization(getExercises(getLowerPool(), exerciseCount)) });
+    plan.push(getRestDay());
     plan.push({ name: 'Upper Body B', type: 'Workout', exercises: applyPeriodization(getExercises(getUpperPool(true), exerciseCount)) });
     plan.push({ name: 'Lower Body B', type: 'Workout', exercises: applyPeriodization(getExercises(getLowerPool(true), exerciseCount)) });
+    plan.push(getRestDay(), getRestDay());
   } else if (days === 5) {
     plan.push({ name: 'Push Day', type: 'Workout', exercises: applyPeriodization(getExercises(EXERCISE_DB.Push, exerciseCount)) });
     plan.push({ name: 'Pull Day', type: 'Workout', exercises: applyPeriodization(getExercises(EXERCISE_DB.Pull, exerciseCount)) });
     plan.push({ name: 'Leg Day', type: 'Workout', exercises: applyPeriodization(getExercises(EXERCISE_DB.Legs, exerciseCount)) });
+    plan.push(getRestDay()); // Jeda rest day ditengah
     plan.push({ name: 'Upper Body', type: 'Workout', exercises: applyPeriodization(getExercises(getUpperPool(), exerciseCount)) });
     plan.push({ name: 'Lower Body', type: 'Workout', exercises: applyPeriodization(getExercises(getLowerPool(), exerciseCount)) });
+    plan.push(getRestDay());
   } else if (days >= 6) {
     plan.push({ name: 'Push Day A', type: 'Workout', exercises: applyPeriodization(getExercises(EXERCISE_DB.Push, exerciseCount)) });
     plan.push({ name: 'Pull Day A', type: 'Workout', exercises: applyPeriodization(getExercises(EXERCISE_DB.Pull, exerciseCount)) });
@@ -181,11 +192,12 @@ export const generateWorkoutPlan = (exp: Experience, days: number, goal: Goal, w
     plan.push({ name: 'Push Day B', type: 'Workout', exercises: applyPeriodization(getExercises([...EXERCISE_DB.Push].reverse(), exerciseCount)) });
     plan.push({ name: 'Pull Day B', type: 'Workout', exercises: applyPeriodization(getExercises([...EXERCISE_DB.Pull].reverse(), exerciseCount)) });
     plan.push({ name: 'Leg Day B', type: 'Workout', exercises: applyPeriodization(getExercises([...EXERCISE_DB.Legs].reverse(), exerciseCount)) });
+    plan.push(getRestDay());
   }
 
-  // Sisa hari diisi Rest Day sampai total 7 hari
+  // Pengaman: Jika karena suatu alasan array kurang dari 7 hari, akan diisi dengan Rest Day
   while (plan.length < 7) {
-    plan.push({ name: 'Rest Day', type: 'Rest', exercises: [] });
+    plan.push(getRestDay());
   }
 
   return plan;
