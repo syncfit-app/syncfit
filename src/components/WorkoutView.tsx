@@ -138,12 +138,22 @@ export const WorkoutView: React.FC = () => {
   };
 
   const openAddExercise = () => {
-    setExerciseForm({ name: '', sets: 3, reps: '', rir: 'RIR 2', rest: '60s', videoUrl: '', note: '' });
+    setExerciseForm({ name: '', sets: 3, reps: '10', rir: 'RIR 2', rest: '60s', videoUrl: '', note: '' });
     setEditingExerciseIndex(null); setIsExerciseModalOpen(true);
   };
 
   const openEditExercise = (idx: number, e: React.MouseEvent) => {
-    e.stopPropagation(); setExerciseForm({ ...activeWorkout.exercises[idx] });
+    e.stopPropagation(); 
+    setExerciseForm({ 
+      name: activeWorkout.exercises[idx].name || '',
+      sets: activeWorkout.exercises[idx].sets || 3,
+      reps: activeWorkout.exercises[idx].reps || '10',
+      rir: activeWorkout.exercises[idx].rir || 'RIR 2',
+      rest: activeWorkout.exercises[idx].rest || '60s',
+      videoUrl: activeWorkout.exercises[idx].videoUrl || '',
+      note: activeWorkout.exercises[idx].note || '',
+      isStatic: activeWorkout.exercises[idx].isStatic
+    });
     setEditingExerciseIndex(idx); setIsExerciseModalOpen(true);
   };
 
@@ -351,8 +361,41 @@ export const WorkoutView: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="bg-[#FF5E00]/20 border border-[#FF5E00]/40 px-3 py-1 rounded-full text-[10px] sm:text-xs font-black text-[#FF5E00] uppercase tracking-wider">Minggu {selectedWeek}</span>
                   <span className="bg-slate-800 border border-slate-700 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider">{formExp}</span>
-                  <span className="bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-indigo-300 uppercase tracking-wider">{formGoal}</span>
+                  
+                  {/* EDIT GOAL INLINE */}
+                  {isEditingGoal ? (
+                    <div className="flex items-center gap-1.5 bg-slate-800 p-1 rounded-full border border-indigo-500/50">
+                      <select
+                        value={tempGoal}
+                        onChange={(e) => setTempGoal(e.target.value)}
+                        className="bg-transparent text-indigo-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
+                      >
+                        <option value="Hypertrophy" className="bg-slate-900 text-white">Hypertrophy</option>
+                        <option value="Strength" className="bg-slate-900 text-white">Strength</option>
+                        <option value="Fat Loss" className="bg-slate-900 text-white">Fat Loss</option>
+                        <option value="General Fitness" className="bg-slate-900 text-white">General Fitness</option>
+                      </select>
+                      <button onClick={handleSaveGoal} className="bg-indigo-600 hover:bg-indigo-500 text-white p-1 rounded-full transition-colors">
+                        <Check className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => setIsEditingGoal(false)} className="bg-slate-700 hover:bg-slate-600 text-slate-300 p-1 rounded-full transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                      {formGoal}
+                      <button 
+                        onClick={() => { setTempGoal(formGoal); setIsEditingGoal(true); }}
+                        className="hover:text-white transition-colors p-0.5"
+                        title="Edit Target Utama"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
                 </div>
+
                 {isEditingName ? (
                   <div className="flex items-center gap-2 mt-1">
                     <input type="text" value={tempDayName} onChange={(e) => setTempDayName(e.target.value)} className="bg-slate-800 text-white text-2xl sm:text-3xl font-black rounded-xl px-4 py-2 border border-slate-600 focus:outline-none focus:border-[#FF5E00] w-full max-w-[250px] sm:max-w-sm" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveDayName()} />
@@ -449,10 +492,12 @@ export const WorkoutView: React.FC = () => {
                           )}
                         </div>
                         
+                        {/* BADGE DETAIL GERAKAN */}
                         <div className={`flex flex-wrap gap-2 text-[11px] font-bold ${isCompleted ? 'opacity-60' : ''}`}>
                           <span className="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-100">{ex.sets} Sets</span>
                           <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-md border border-emerald-100">{ex.reps}</span>
                           <span className="bg-purple-50 text-purple-600 px-2.5 py-1 rounded-md border border-purple-100">{ex.rir || 'RIR 2'}</span>
+                          <span className="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-md border border-amber-100">Rest {ex.rest || '60s'}</span>
                         </div>
 
                         {hasLogs && (
@@ -481,49 +526,101 @@ export const WorkoutView: React.FC = () => {
       )}
 
       {/* MODAL SET BEBAN & REPS */}
-      {isSetModalOpen && activeSetExerciseIdx !== null && activeWorkout?.exercises[activeSetExerciseIdx] && (
-        <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 relative shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div><span className="text-xs font-bold text-[#FF5E00] uppercase block">Catat Beban & Reps</span><h3 className="font-black text-[#111827] text-xl">{activeWorkout.exercises[activeSetExerciseIdx].name}</h3></div>
-              <button onClick={() => setIsSetModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center transition-colors hover:bg-slate-200"><X className="w-4 h-4" /></button>
-            </div>
+      {isSetModalOpen && activeSetExerciseIdx !== null && activeWorkout?.exercises[activeSetExerciseIdx] && (() => {
+        const currentExercise = activeWorkout.exercises[activeSetExerciseIdx];
+        const isStaticExercise = currentExercise.isStatic || currentExercise.reps?.toLowerCase().includes('s');
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-12 gap-2 text-[11px] font-black uppercase text-slate-400 px-1">
-                <span className="col-span-2">Set</span><span className="col-span-4">Beban (kg)</span><span className="col-span-4">Reps / Durasi</span><span className="col-span-2 text-center">Done</span>
-              </div>
-              {tempSets.map((s, idx) => (
-                <div key={idx} className={`grid grid-cols-12 gap-2 items-center p-2 rounded-2xl border ${s.completed ? 'bg-emerald-50/50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="col-span-2 font-black text-slate-700 text-sm flex items-center"><span className="w-6 h-6 rounded-lg bg-slate-200/60 flex items-center justify-center">{idx + 1}</span></div>
-                  <div className="col-span-4"><input type="number" step="0.5" placeholder="kg" value={s.weight} onChange={(e) => handleUpdateSetRow(idx, 'weight', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827]" /></div>
-                  <div className="col-span-4"><input type="text" placeholder="reps" value={s.reps} onChange={(e) => handleUpdateSetRow(idx, 'reps', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827]" /></div>
-                  <div className="col-span-2 flex items-center justify-center gap-1">
-                    <button onClick={() => handleUpdateSetRow(idx, 'completed', !s.completed)} className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.completed ? 'bg-emerald-500 text-white' : 'bg-white border text-slate-300'}`}><Check className="w-4 h-4" /></button>
-                    {tempSets.length > 1 && <button onClick={() => handleRemoveSetRow(idx)} className="text-slate-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>}
-                  </div>
+        return (
+          <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 relative shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <span className="text-xs font-bold text-[#FF5E00] uppercase block">Catat Beban & Reps</span>
+                  <h3 className="font-black text-[#111827] text-xl">{currentExercise.name}</h3>
                 </div>
-              ))}
-            </div>
-            <button onClick={handleAddSetRow} className="w-full py-2.5 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-slate-500"><Plus className="w-4 h-4 inline" /> Tambah Baris Set</button>
-            <button onClick={handleSaveSetLogs} className="w-full bg-[#FF5E00] hover:bg-[#E05300] transition-colors text-white py-4 rounded-2xl font-black shadow-lg shadow-orange-500/20">Simpan Pencatatan</button>
-          </div>
-        </div>
-      )}
+                <button onClick={() => setIsSetModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center transition-colors hover:bg-slate-200"><X className="w-4 h-4" /></button>
+              </div>
 
-      {/* MODAL EDIT GERAKAN */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-12 gap-2 text-[11px] font-black uppercase text-slate-400 px-1">
+                  <span className="col-span-2">Set</span>
+                  <span className="col-span-4">Beban (kg)</span>
+                  <span className="col-span-4">{isStaticExercise ? 'Durasi (detik)' : 'Reps / Durasi'}</span>
+                  <span className="col-span-2 text-center">Done</span>
+                </div>
+                {tempSets.map((s, idx) => (
+                  <div key={idx} className={`grid grid-cols-12 gap-2 items-center p-2 rounded-2xl border ${s.completed ? 'bg-emerald-50/50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="col-span-2 font-black text-slate-700 text-sm flex items-center"><span className="w-6 h-6 rounded-lg bg-slate-200/60 flex items-center justify-center">{idx + 1}</span></div>
+                    <div className="col-span-4"><input type="number" step="0.5" placeholder="kg" value={s.weight} onChange={(e) => handleUpdateSetRow(idx, 'weight', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827]" /></div>
+                    <div className="col-span-4"><input type="text" placeholder={isStaticExercise ? 'detik (mis: 45s)' : 'reps'} value={s.reps} onChange={(e) => handleUpdateSetRow(idx, 'reps', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827]" /></div>
+                    <div className="col-span-2 flex items-center justify-center gap-1">
+                      <button onClick={() => handleUpdateSetRow(idx, 'completed', !s.completed)} className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.completed ? 'bg-emerald-500 text-white' : 'bg-white border text-slate-300'}`}><Check className="w-4 h-4" /></button>
+                      {tempSets.length > 1 && <button onClick={() => handleRemoveSetRow(idx)} className="text-slate-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={handleAddSetRow} className="w-full py-2.5 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-slate-500"><Plus className="w-4 h-4 inline" /> Tambah Baris Set</button>
+              <button onClick={handleSaveSetLogs} className="w-full bg-[#FF5E00] hover:bg-[#E05300] transition-colors text-white py-4 rounded-2xl font-black shadow-lg shadow-orange-500/20">Simpan Pencatatan</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MODAL EDIT & TAMBAH GERAKAN */}
       {isExerciseModalOpen && (
         <div className="fixed inset-0 bg-[#111827]/80 z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6">
-            <div className="flex justify-between border-b pb-4"><h3 className="font-black text-lg">Edit Gerakan</h3><button onClick={() => setIsExerciseModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center"><X className="w-4 h-4" /></button></div>
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-4">
+              <h3 className="font-black text-lg text-[#111827]">{editingExerciseIndex !== null ? 'Edit Gerakan' : 'Tambah Gerakan'}</h3>
+              <button onClick={() => setIsExerciseModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
             <div className="space-y-4">
-              <div><label className="text-xs font-bold text-slate-500">Nama</label><input type="text" value={exerciseForm.name} onChange={(e) => setExerciseForm({...exerciseForm, name: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3" /></div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">Nama Gerakan</label>
+                <input type="text" value={exerciseForm.name} onChange={(e) => setExerciseForm({...exerciseForm, name: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold text-[#111827]" placeholder="Contoh: Barbell Bench Press" />
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-xs font-bold text-slate-500">Set</label><input type="number" value={exerciseForm.sets} onChange={(e) => setExerciseForm({...exerciseForm, sets: parseInt(e.target.value)})} className="w-full bg-slate-50 border rounded-xl px-4 py-3" /></div>
-                <div><label className="text-xs font-bold text-slate-500">Reps</label><input type="text" value={exerciseForm.reps} onChange={(e) => setExerciseForm({...exerciseForm, reps: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3" /></div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Jumlah Set</label>
+                  <input type="number" value={exerciseForm.sets} onChange={(e) => setExerciseForm({...exerciseForm, sets: parseInt(e.target.value) || 0})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold text-[#111827]" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Jumlah Reps / Durasi</label>
+                  <input type="text" value={exerciseForm.reps} onChange={(e) => setExerciseForm({...exerciseForm, reps: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold text-[#111827]" placeholder="8-10 / 45s" />
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium">*Tambahkan "s" (mis: 45s) untuk gerakan statis</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Durasi Rest</label>
+                  <input type="text" value={exerciseForm.rest} onChange={(e) => setExerciseForm({...exerciseForm, rest: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold text-[#111827]" placeholder="60s / 90s" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">RIR (Target)</label>
+                  <input type="text" value={exerciseForm.rir || ''} onChange={(e) => setExerciseForm({...exerciseForm, rir: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold text-[#111827]" placeholder="RIR 1-2" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">URL Video Demo (Opsional)</label>
+                <input type="text" value={exerciseForm.videoUrl || ''} onChange={(e) => setExerciseForm({...exerciseForm, videoUrl: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold text-[#111827]" placeholder="https://..." />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">Catatan Gerakan (Opsional)</label>
+                <input type="text" value={exerciseForm.note || ''} onChange={(e) => setExerciseForm({...exerciseForm, note: e.target.value})} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold text-[#111827]" placeholder="Instruksi / Catatan tambahan..." />
               </div>
             </div>
-            <button onClick={handleSaveExercise} className="w-full bg-[#FF5E00] text-white py-4 rounded-2xl font-black">Simpan</button>
+
+            <button onClick={handleSaveExercise} className="w-full bg-[#FF5E00] hover:bg-[#E05300] text-white py-4 rounded-2xl font-black transition-colors shadow-lg shadow-orange-500/20">
+              Simpan Gerakan
+            </button>
           </div>
         </div>
       )}
