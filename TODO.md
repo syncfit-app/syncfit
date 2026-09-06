@@ -15,7 +15,7 @@ Update tabel ini setiap kali sebuah task berubah status (lihat aturan di `WORKFL
 
 | ID | Task | Area | Status | Prioritas | Catatan |
 |---|---|---|---|---|---|
-| B1 | Error handling saat simpan sesi ke `workout_logs`/`exercise_logs` | Workout Page | Todo | Tinggi | Saat ini gagal insert = data hilang diam-diam |
+| B1 | Error handling saat simpan sesi ke `workout_logs`/`exercise_logs` | Workout Page | Done | — | Teruji 4 skenario (normal, offline, retry, refresh saat pending) tanpa duplikat/kehilangan data |
 | B2 | Update XP & streak setelah sesi selesai | Workout Page / Gamifikasi | Todo | Tinggi | Kolom ada di DB, logic belum ada sama sekali. Perlu diskusi formula dulu |
 | B3 | Kalkulasi kalori lebih akurat (MET per jenis latihan) | Workout Page | Todo | Sedang | Saat ini MET=5.0 tetap untuk semua exercise |
 | B4 | Progresi minggu (`current_week`) otomatis/keputusan sadar | Workout Page / Program | Todo | Sedang | Perlu diskusi perilaku yang diinginkan dulu |
@@ -29,6 +29,7 @@ Update tabel ini setiap kali sebuah task berubah status (lihat aturan di `WORKFL
 | C2 | Hubungkan grafik & PR di ProgressView ke data asli | Progress | Todo | Rendah | Berat badan sudah asli, sisanya mock |
 | C3 | Integrasi fitur nutrisi (`foods`) ke NutritionView | Nutrisi | Todo | Rendah | Saat ini 100% mock |
 | C4 | Integrasi `gps_activities` ke GPSView (tracking GPS asli) | GPS/Cardio | Todo | Rendah | Saat ini 100% mock/simulasi |
+| C5 | Ikon dumbbell gepeng/distorsi di PNG hasil "Simpan Stiker" | Workout Page / Recap | Todo | Rendah | Bug lama, tidak terkait B1 — html2canvas kemungkinan tidak menghormati object-contain saat render ke canvas |
 
 ## Selesai
 
