@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download,
-  Edit2, Save, Trash2, Plus
+  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2
 } from 'lucide-react';
 
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
@@ -15,6 +15,23 @@ export interface SetDetail {
   reps: string;
   completed: boolean;
 }
+
+// Data 1 sesi latihan yang sudah dihitung, siap dikirim ke DB.
+// Disimpan utuh di localStorage saat gagal terkirim, supaya bisa di-retry tanpa hitung ulang / kehilangan data.
+interface PendingSession {
+  workout_name: string;
+  duration_seconds: number;
+  calories_burned: number;
+  exercises_completed: string[];
+  set_logs: {
+    exercise_key: string;
+    set_number: number;
+    reps_achieved: number;
+    weight_kg: number;
+  }[];
+}
+
+const PENDING_SESSION_KEY = 'sfit_pending_session';
 
 export const WorkoutView: React.FC = () => {
   // STATE CLOUD
@@ -65,6 +82,14 @@ export const WorkoutView: React.FC = () => {
   const [isSetModalOpen, setIsSetModalOpen] = useState(false);
   const [activeSetExerciseIdx, setActiveSetExerciseIdx] = useState<number | null>(null);
   const [tempSets, setTempSets] = useState<SetDetail[]>([]);
+
+  // B1: status simpan sesi ke server. `pendingSession` != null artinya ada sesi
+  // yang sudah selesai secara lokal tapi belum berhasil masuk ke database.
+  const [pendingSession, setPendingSession] = useState<PendingSession | null>(() => {
+    const saved = localStorage.getItem(PENDING_SESSION_KEY);
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [isSavingSession, setIsSavingSession] = useState(false);
 
   const hasActivePlan = activePlan.length > 0;
   const activeWorkout = activePlan[selectedDay];
@@ -258,61 +283,120 @@ export const WorkoutView: React.FC = () => {
     setIsWorkoutActive(true); setIsTimerMinimized(false);
   };
 
-  const handleEndSession = async () => {
-    setIsWorkoutActive(false); setIsTimerMinimized(false);
-    localStorage.removeItem('sfit_is_active'); localStorage.removeItem('sfit_start_time');
-    
+  // Menyusun payload sesi dari state saat ini (durasi berjalan, set yang sudah dicatat, dst).
+  // Dipisah dari proses simpan supaya payload yang sama bisa dipakai ulang saat retry.
+  const buildSessionPayload = (): PendingSession => {
     const userWeightKg = parseFloat(localStorage.getItem('sfit_user_weight') || '70');
-    const MET_VALUE = 5.0; 
+    const MET_VALUE = 5.0;
     const calculatedCalories = Math.max(5, Math.round((MET_VALUE * userWeightKg * timer) / 3600));
-    
-    setWorkoutStats({ duration: timer, calories: calculatedCalories, date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()) });
-    setIsRecapModalOpen(true);
-    
-    const completedExerciseNames = completedExercises[selectedDay] ? completedExercises[selectedDay].map(idx => activeWorkout?.exercises[idx].name) : [];
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // 1. Simpan Recap Latihan
-        await supabase.from('workout_logs').insert({
-          user_id: user.id, workout_name: activeWorkout?.name || 'Workout Session',
-          duration_seconds: timer, calories_burned: calculatedCalories, exercises_completed: completedExerciseNames
-        });
+    const completedExerciseNames = completedExercises[selectedDay]
+      ? completedExercises[selectedDay].map(idx => activeWorkout?.exercises[idx]?.name).filter((n): n is string => !!n)
+      : [];
 
-        // 2. Simpan Data Reps & Beban ke exercise_logs
-        const setLogsToInsert: any[] = [];
-        
-        Object.keys(exerciseSetLogs).forEach(key => {
-          const [dayIdx, exIdx] = key.split('-');
-          if (parseInt(dayIdx) === selectedDay) {
-            const exerciseName = activeWorkout?.exercises[parseInt(exIdx)]?.name || 'Unknown Exercise';
-            const setsData = exerciseSetLogs[key];
-            
-            setsData.forEach((set, idx) => {
-              if (set.completed) {
-                setLogsToInsert.push({
-                  user_id: user.id,
-                  exercise_key: exerciseName,
-                  set_number: idx + 1,
-                  reps_achieved: parseInt(set.reps) || 0,
-                  weight_kg: parseFloat(set.weight) || 0
-                });
-              }
+    const setLogsToInsert: PendingSession['set_logs'] = [];
+    Object.keys(exerciseSetLogs).forEach(key => {
+      const [dayIdx, exIdx] = key.split('-');
+      if (parseInt(dayIdx) === selectedDay) {
+        const exerciseName = activeWorkout?.exercises[parseInt(exIdx)]?.name || 'Unknown Exercise';
+        exerciseSetLogs[key].forEach((set, idx) => {
+          if (set.completed) {
+            setLogsToInsert.push({
+              exercise_key: exerciseName,
+              set_number: idx + 1,
+              reps_achieved: parseInt(set.reps) || 0,
+              weight_kg: parseFloat(set.weight) || 0
             });
           }
         });
-
-        if (setLogsToInsert.length > 0) {
-          const { error } = await supabase.from('exercise_logs').insert(setLogsToInsert);
-          if (error) console.error("Gagal simpan exercise_logs:", error);
-        }
       }
-    } catch (e) {
-      console.error("Error saat mengakhiri sesi:", e);
+    });
+
+    return {
+      workout_name: activeWorkout?.name || 'Workout Session',
+      duration_seconds: timer,
+      calories_burned: calculatedCalories,
+      exercises_completed: completedExerciseNames,
+      set_logs: setLogsToInsert,
+    };
+  };
+
+  // Simpan/hapus payload yang sedang menunggu retry, sekaligus persist ke localStorage
+  // supaya tidak hilang kalau user refresh/tutup tab sebelum sempat retry.
+  const persistPendingSession = (payload: PendingSession | null) => {
+    setPendingSession(payload);
+    if (payload) {
+      localStorage.setItem(PENDING_SESSION_KEY, JSON.stringify(payload));
+    } else {
+      localStorage.removeItem(PENDING_SESSION_KEY);
     }
-    
+  };
+
+  // Insert ke workout_logs + exercise_logs. Return true/false, tidak pernah throw ke caller.
+  const saveSessionToDB = async (payload: PendingSession): Promise<boolean> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { error: workoutError } = await supabase.from('workout_logs').insert({
+        user_id: user.id,
+        workout_name: payload.workout_name,
+        duration_seconds: payload.duration_seconds,
+        calories_burned: payload.calories_burned,
+        exercises_completed: payload.exercises_completed,
+      });
+      if (workoutError) throw workoutError;
+
+      if (payload.set_logs.length > 0) {
+        const { error: setError } = await supabase.from('exercise_logs').insert(
+          payload.set_logs.map(s => ({ user_id: user.id, ...s }))
+        );
+        if (setError) throw setError;
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Gagal menyimpan sesi latihan:', e);
+      return false;
+    }
+  };
+
+  const handleEndSession = async () => {
+    setIsWorkoutActive(false); setIsTimerMinimized(false);
+    localStorage.removeItem('sfit_is_active'); localStorage.removeItem('sfit_start_time');
+
+    const payload = buildSessionPayload();
+    setWorkoutStats({ duration: payload.duration_seconds, calories: payload.calories_burned, date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()) });
+
+    setIsSavingSession(true);
+    const success = await saveSessionToDB(payload);
+    setIsSavingSession(false);
+
+    if (success) {
+      persistPendingSession(null);
+      setIsRecapModalOpen(true);
+    } else {
+      // Jangan tampilkan recap seolah berhasil — simpan payload untuk di-retry,
+      // banner peringatan akan muncul di halaman.
+      persistPendingSession(payload);
+    }
+
     setSessionStartTime(null); setTimer(0);
+  };
+
+  // Dipanggil dari tombol "Coba Simpan Lagi" di banner peringatan.
+  const handleRetryPendingSession = async () => {
+    if (!pendingSession) return;
+    setIsSavingSession(true);
+    const success = await saveSessionToDB(pendingSession);
+    setIsSavingSession(false);
+
+    if (success) {
+      setWorkoutStats({ duration: pendingSession.duration_seconds, calories: pendingSession.calories_burned, date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()) });
+      persistPendingSession(null);
+      setIsRecapModalOpen(true);
+    }
+    // Kalau masih gagal, pendingSession & banner tetap ada — user bisa coba lagi kapan saja.
   };
 
   const formatTime = (seconds: number) => {
@@ -345,6 +429,31 @@ export const WorkoutView: React.FC = () => {
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 pt-0 relative font-sans">
+      {/* BANNER: sesi selesai tapi gagal tersimpan ke server */}
+      {pendingSession && (
+        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-black text-[#111827] text-sm">Sesi latihan belum tersimpan ke server</p>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                "{pendingSession.workout_name}" ({formatTime(pendingSession.duration_seconds)}) gagal diunggah, kemungkinan karena koneksi internet. Data latihanmu masih aman tersimpan di perangkat ini.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleRetryPendingSession}
+            disabled={isSavingSession}
+            className="shrink-0 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-colors"
+          >
+            {isSavingSession ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+            Coba Simpan Lagi
+          </button>
+        </div>
+      )}
+
       {!hasActivePlan ? (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 space-y-6 animate-fade-in">
           <div className="w-24 h-24 bg-orange-500/10 rounded-full flex items-center justify-center mb-2"><Wand2 className="w-12 h-12 text-[#FF5E00]" /></div>
@@ -742,7 +851,10 @@ export const WorkoutView: React.FC = () => {
               </div>
             )}
             <div className="mt-1 mb-1 flex justify-center">
-              <img src="/dumbble.png" alt="Dumbbell Icon" className="w-24 h-24 object-contain bg-transparent drop-shadow-md" />
+              {/* Ukuran kotak (96x64) sengaja disamakan dengan rasio asli dumbble.png (1536x1024 = 3:2).
+                  html2canvas tidak selalu menghormati object-fit saat render ke canvas, jadi object-contain
+                  saja tidak cukup — kotaknya sendiri harus sudah proporsional. */}
+              <img src="/dumbble.png" alt="Dumbbell Icon" className="w-24 h-16 object-contain bg-transparent drop-shadow-md" />
             </div>
             <div className="flex items-center justify-center mt-2 mb-1">
               <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>SYNC<span className="text-[#FF5E00]">FIT</span></span>
