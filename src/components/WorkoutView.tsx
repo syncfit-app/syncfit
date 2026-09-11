@@ -5,8 +5,9 @@ import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download,
-  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2
+  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2, GripVertical
 } from 'lucide-react';
+import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
 import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
 
@@ -32,6 +33,38 @@ interface PendingSession {
 }
 
 const PENDING_SESSION_KEY = 'sfit_pending_session';
+
+// D1: kartu hari di "Weekly Split Plan" — bisa di-drag DAN jadi target drop sekaligus,
+// supaya hari manapun bisa ditukar dengan hari manapun. Pakai @dnd-kit/core karena
+// drag & drop bawaan HTML5 tidak berfungsi di layar sentuh (HP).
+interface DayTabProps {
+  index: number;
+  item: DayPlan;
+  isActive: boolean;
+  onSelect: () => void;
+}
+
+const DayTab: React.FC<DayTabProps> = ({ index, item, isActive, onSelect }) => {
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: index });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: index });
+
+  return (
+    <button
+      ref={(node) => { setDragRef(node); setDropRef(node); }}
+      {...listeners}
+      {...attributes}
+      onClick={onSelect}
+      className={`relative flex flex-col items-center justify-center py-3 rounded-xl transition-all border touch-none select-none cursor-grab active:cursor-grabbing ${
+        isActive ? 'bg-[#111827] text-white border-[#111827] scale-110 shadow-lg z-10' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+      } ${isDragging ? 'opacity-40' : ''} ${isOver ? 'ring-2 ring-[#FF5E00] ring-offset-1' : ''}`}
+    >
+      <span className={`text-[10px] font-black uppercase ${isActive ? 'text-[#FF5E00]' : 'text-slate-400'}`}>D{index + 1}</span>
+      <span className={`text-[10px] sm:text-xs font-bold truncate w-full px-1 text-center mt-0.5 ${isActive ? 'text-white' : 'text-slate-700'}`}>
+        {item.name === 'Rest Day' ? 'Rest' : item.name}
+      </span>
+    </button>
+  );
+};
 
 export const WorkoutView: React.FC = () => {
   // STATE CLOUD
@@ -220,6 +253,52 @@ export const WorkoutView: React.FC = () => {
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, week);
     setActivePlan(newPlan); setCompletedExercises({}); setExerciseSetLogs({}); setSelectedDay(0);
     await saveProgramToDB(formExp, formDays, formGoal as Goal, week, newPlan);
+  };
+
+  // D1: sensor drag pakai PointerSensor (nyala di mouse & touch/HP).
+  // activationConstraint jarak 8px supaya tap biasa (pilih hari) tidak salah kepicu jadi drag.
+  const dayDragSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  // Tukar 2 hari SEKALIGUS isinya (nama, exercise, dst) DAN data yang sudah tercatat untuk hari itu
+  // (completedExercises + exerciseSetLogs) — kalau cuma isi hari yang ditukar tanpa datanya ikut,
+  // akan muncul bug yang sama persis seperti B6 (reps/beban nyangkut di slot yang salah).
+  const handleSwapDays = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    const newPlan = [...activePlan];
+    [newPlan[fromIndex], newPlan[toIndex]] = [newPlan[toIndex], newPlan[fromIndex]];
+    setActivePlan(newPlan);
+
+    setCompletedExercises(prev => {
+      const updated = { ...prev };
+      const fromVal = updated[fromIndex] || [];
+      const toVal = updated[toIndex] || [];
+      updated[fromIndex] = toVal;
+      updated[toIndex] = fromVal;
+      return updated;
+    });
+
+    setExerciseSetLogs(prev => {
+      const updated: Record<string, SetDetail[]> = {};
+      Object.keys(prev).forEach(key => {
+        const [dayIdxStr, exIdxStr] = key.split('-');
+        const dayIdx = parseInt(dayIdxStr, 10);
+        let newDayIdx = dayIdx;
+        if (dayIdx === fromIndex) newDayIdx = toIndex;
+        else if (dayIdx === toIndex) newDayIdx = fromIndex;
+        updated[`${newDayIdx}-${exIdxStr}`] = prev[key];
+      });
+      return updated;
+    });
+
+    saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlan);
+  };
+
+  const handleDayDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      handleSwapDays(Number(active.id), Number(over.id));
+    }
   };
 
   const handleSaveDayName = async () => {
@@ -634,18 +713,17 @@ export const WorkoutView: React.FC = () => {
 
           {/* JADWAL */}
           <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-            <div className="flex items-center justify-between px-1"><h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2"><Calendar className="w-4 h-4 text-[#FF5E00]" />Weekly Split Plan</h3></div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-              {activePlan.map((item, index) => {
-                const isActive = selectedDay === index;
-                return (
-                  <button key={index} onClick={() => setSelectedDay(index)} className={`flex flex-col items-center justify-center py-3 rounded-xl transition-all border ${isActive ? 'bg-[#111827] text-white border-[#111827] scale-110 shadow-lg z-10' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
-                    <span className={`text-[10px] font-black uppercase ${isActive ? 'text-[#FF5E00]' : 'text-slate-400'}`}>D{index + 1}</span>
-                    <span className={`text-[10px] sm:text-xs font-bold truncate w-full px-1 text-center mt-0.5 ${isActive ? 'text-white' : 'text-slate-700'}`}>{item.name === 'Rest Day' ? 'Rest' : item.name}</span>
-                  </button>
-                );
-              })}
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm font-extrabold text-[#111827] flex items-center gap-2"><Calendar className="w-4 h-4 text-[#FF5E00]" />Weekly Split Plan</h3>
+              <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><GripVertical className="w-3 h-3" />Tahan & geser untuk tukar hari</span>
             </div>
+            <DndContext sensors={dayDragSensors} onDragEnd={handleDayDragEnd}>
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {activePlan.map((item, index) => (
+                  <DayTab key={index} index={index} item={item} isActive={selectedDay === index} onSelect={() => setSelectedDay(index)} />
+                ))}
+              </div>
+            </DndContext>
           </div>
 
           {/* LIST LATIHAN */}
