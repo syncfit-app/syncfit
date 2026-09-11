@@ -8,7 +8,7 @@ Dokumen ini adalah konteks wajib dibaca sebelum mengerjakan apapun di project Sy
 - **Hosting:** Vercel — project `syncfit_app`, domain `syncfitpro.vercel.app`
 - **Database:** Supabase (Postgres + Auth + RLS), project `syncfit-db`
 - **Stack frontend:** React 18 + Vite + TypeScript + Tailwind CSS, routing via `react-router-dom` v7
-- **Dependency lain:** `@supabase/supabase-js`, `lucide-react` (ikon), `html2canvas` (export recap sesi jadi gambar)
+- **Dependency lain:** `@supabase/supabase-js`, `lucide-react` (ikon), `html2canvas` (export recap sesi jadi gambar), `@dnd-kit/core` (drag & drop kartu hari, jalan di mouse & touch/HP)
 - **Target user:** individu umum yang ingin latihan/nge-gym secara mandiri (lihat `PRD.md`)
 
 ## Struktur Kode (`src/`)
