@@ -110,7 +110,81 @@ export const WorkoutView: React.FC = () => {
       } catch (error) { console.error(error); } finally { setIsLoading(false); }
     };
     fetchProgram();
+
+    // 3b: saat tab/app ini kembali aktif (misal user baru saja edit program di device lain,
+    // lalu balik ke tab ini), ambil ulang data program tanpa perlu refresh manual.
+    // Query-nya sama persis & seringan load awal — cuma dipicu ulang saat tab difokus,
+    // bukan polling terus-menerus, jadi tidak membebani kuota Supabase.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchProgram();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
+
+  // 3a: rekonstruksi status "selesai" + reps/beban dari data ASLI server (exercise_logs hari ini),
+  // bukan cuma dari localStorage device ini. Query dibatasi ke hari ini saja (created_at >= tengah malam),
+  // jadi ukurannya kecil & murah walau dipanggil tiap ganti hari/plan berubah.
+  const syncTodayProgressFromDB = async (day: number, plan: DayPlan[]) => {
+    const dayPlan = plan[day];
+    if (!dayPlan || !dayPlan.exercises || dayPlan.exercises.length === 0) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const { data: todayLogs, error } = await supabase
+        .from('exercise_logs')
+        .select('exercise_key, set_number, reps_achieved, weight_kg')
+        .eq('user_id', user.id)
+        .gte('created_at', startOfToday.toISOString());
+
+      if (error || !todayLogs || todayLogs.length === 0) return;
+
+      setExerciseSetLogs(prev => {
+        const updated = { ...prev };
+        dayPlan.exercises.forEach((ex, idx) => {
+          const serverSets = todayLogs.filter(l => l.exercise_key === ex.name);
+          if (serverSets.length === 0) return;
+
+          const key = `${day}-${idx}`;
+          const existing = updated[key] || [];
+          const merged: SetDetail[] = Array.from({ length: ex.sets }, (_, i) => existing[i] || { weight: '', reps: '', completed: false });
+          serverSets.forEach(s => {
+            const i = s.set_number - 1;
+            // Data server dianggap pelengkap, bukan penimpa — kalau device ini sendiri
+            // sudah punya progres lokal untuk set itu, biarkan (menghindari sesi aktif tertimpa).
+            if (i >= 0 && i < merged.length && !merged[i].completed) {
+              merged[i] = { weight: String(s.weight_kg), reps: String(s.reps_achieved), completed: true };
+            }
+          });
+          updated[key] = merged;
+        });
+        return updated;
+      });
+
+      setCompletedExercises(prev => {
+        const updatedDay = new Set(prev[day] || []);
+        dayPlan.exercises.forEach((ex, idx) => {
+          const serverSetsCount = todayLogs.filter(l => l.exercise_key === ex.name).length;
+          if (serverSetsCount >= ex.sets) updatedDay.add(idx);
+        });
+        return { ...prev, [day]: Array.from(updatedDay) };
+      });
+    } catch (e) {
+      console.error('Gagal sinkronisasi progres hari ini:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (activePlan.length > 0) {
+      syncTodayProgressFromDB(selectedDay, activePlan);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDay, activePlan]);
 
   const saveProgramToDB = async (exp: Experience, days: number, goal: string, week: number, plan: DayPlan[]) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -137,14 +211,14 @@ export const WorkoutView: React.FC = () => {
 
   const handleGeneratePlan = async () => {
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, selectedWeek);
-    setActivePlan(newPlan); setCompletedExercises({}); setIsConfigModalOpen(false); setSelectedDay(0);
+    setActivePlan(newPlan); setCompletedExercises({}); setExerciseSetLogs({}); setIsConfigModalOpen(false); setSelectedDay(0);
     await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlan);
   };
 
   const handleWeekChange = async (week: number) => {
     setSelectedWeek(week);
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, week);
-    setActivePlan(newPlan); setCompletedExercises({}); setSelectedDay(0);
+    setActivePlan(newPlan); setCompletedExercises({}); setExerciseSetLogs({}); setSelectedDay(0);
     await saveProgramToDB(formExp, formDays, formGoal as Goal, week, newPlan);
   };
 
