@@ -11,15 +11,16 @@ Update tabel ini setiap kali sebuah task berubah status (lihat aturan di `WORKFL
 | A1b | Fungsionalkan menu di ProfileView (Edit Profil, Settings, dll) | Profile | Todo | Rendah | Saat ini hanya UI dekoratif, belum ada onClick |
 | A2 | Program Generator (generate & regenerate) | Program | Done | — | `workoutEngine.ts` + `WorkoutView`, rule-based |
 
-## Prioritas Sekarang: Menyempurnakan Halaman Workout
+## Prioritas Sekarang: Halaman Workout (urutan sesuai kesepakatan)
 
-| ID | Task | Area | Status | Prioritas | Catatan |
+| ID | Task | Area | Status | Urutan | Catatan |
 |---|---|---|---|---|---|
-| B1 | Error handling saat simpan sesi ke `workout_logs`/`exercise_logs` | Workout Page | Done | — | Teruji 4 skenario (normal, offline, retry, refresh saat pending) tanpa duplikat/kehilangan data |
-| B2 | Update XP & streak setelah sesi selesai | Workout Page / Gamifikasi | Todo | Tinggi | Kolom ada di DB, logic belum ada sama sekali. Perlu diskusi formula dulu |
-| B3 | Kalkulasi kalori lebih akurat (MET per jenis latihan) | Workout Page | Todo | Sedang | Saat ini MET=5.0 tetap untuk semua exercise |
-| B4 | Progresi minggu (`current_week`) otomatis/keputusan sadar | Workout Page / Program | Todo | Sedang | Perlu diskusi perilaku yang diinginkan dulu |
-| B5 | Rest timer antar-set | Workout Page | Todo | Rendah | Cek dulu apakah dibutuhkan sekarang |
+| D1 | Tukar posisi hari (swap) di Weekly Split Plan | Workout Page / Program | Todo | 1 (berikutnya) | Misal D1 Push \u2194 D2 Pull. Desain teknis belum dibahas detail |
+| D2 | Export/import menu latihan sebagai file (share antar-user) | Workout Page / Program | Todo | 2 | Perlu desain format file aman (JSON tervalidasi, bukan executable), strip data personal (reps/beban) saat export |
+| B2 | Update XP & streak setelah sesi selesai | Workout Page / Gamifikasi | Todo | 3 | Formula disepakati: **+2 XP per set selesai**. Streak berbasis jarak antar-sesi (`expected_gap = ceil(7/days)` hari), bukan kalender minggu — direset kalau jeda antar sesi melebihi itu |
+| B3 | Kalkulasi kalori lebih akurat (MET per jenis latihan) | Workout Page | Todo | Belum diurutkan | Saat ini MET=5.0 tetap untuk semua exercise |
+| B4 | Progresi minggu (`current_week`) otomatis/keputusan sadar | Workout Page / Program | Todo | Belum diurutkan | Perlu diskusi perilaku yang diinginkan dulu |
+| B5 | Rest timer antar-set | Workout Page | Todo | Belum diurutkan | Cek dulu apakah dibutuhkan sekarang |
 
 ## Backlog (belum prioritas)
 
@@ -29,7 +30,6 @@ Update tabel ini setiap kali sebuah task berubah status (lihat aturan di `WORKFL
 | C2 | Hubungkan grafik & PR di ProgressView ke data asli | Progress | Todo | Rendah | Berat badan sudah asli, sisanya mock |
 | C3 | Integrasi fitur nutrisi (`foods`) ke NutritionView | Nutrisi | Todo | Rendah | Saat ini 100% mock |
 | C4 | Integrasi `gps_activities` ke GPSView (tracking GPS asli) | GPS/Cardio | Todo | Rendah | Saat ini 100% mock/simulasi |
-| C5 | Ikon dumbbell gepeng/distorsi di PNG hasil "Simpan Stiker" | Workout Page / Recap | Todo | Rendah | Bug lama, tidak terkait B1 — html2canvas kemungkinan tidak menghormati object-contain saat render ke canvas |
 
 ## Selesai
 
@@ -39,3 +39,7 @@ Update tabel ini setiap kali sebuah task berubah status (lihat aturan di `WORKFL
 | — | Skema database dasar (`profiles`, `user_programs`, `workout_logs`, `exercise_logs`) | Database | Done | RLS aktif di semua tabel user-data |
 | A1 | Auth & Profile | Auth/Profile | Done | Lihat catatan di tabel Fondasi |
 | A2 | Program Generator | Program | Done | Lihat catatan di tabel Fondasi |
+| B1 | Error handling saat simpan sesi ke `workout_logs`/`exercise_logs` | Workout Page | Done | Teruji 4 skenario (normal, offline, retry, refresh saat pending) tanpa duplikat/kehilangan data |
+| C5 | Ikon dumbbell gepeng/distorsi di PNG hasil "Simpan Stiker" | Workout Page / Recap | Done | Root cause: rasio kotak gambar (96x96) tidak sama dengan rasio asli file (1536x1024). Diperbaiki jadi 96x64 |
+| B6 | Bug: data reps/beban lama kebawa saat generate ulang plan/minggu | Workout Page | Done | Root cause: `exerciseSetLogs` tidak direset saat regenerate (cuma `completedExercises` yang direset). Ditemukan user saat testing B1 |
+| B7 | Sync lintas device: centang exercise & edit program tidak konsisten antar-device | Workout Page / Program | Done | 2 perbaikan: (1) rekonstruksi status dari `exercise_logs` hari ini saat ganti hari/buka halaman, (2) refetch `user_programs` otomatis saat tab kembali aktif (`visibilitychange`). Teruji di 2 browser berbeda |
