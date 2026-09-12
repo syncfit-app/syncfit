@@ -20,7 +20,6 @@ Update tabel ini setiap kali sebuah task berubah status (lihat aturan di `WORKFL
 | B3 | Kalkulasi kalori lebih akurat (MET per jenis latihan) | Workout Page | Todo | Belum diurutkan | Saat ini MET=5.0 tetap untuk semua exercise |
 | B4 | Progresi minggu (`current_week`) otomatis/keputusan sadar | Workout Page / Program | Todo | Belum diurutkan | Perlu diskusi perilaku yang diinginkan dulu |
 | B5 | Rest timer antar-set | Workout Page | Todo | Belum diurutkan | Cek dulu apakah dibutuhkan sekarang |
-| B10 | `goal` (Hypertrophy/Strength/Fat Loss/General Fitness) tidak mempengaruhi program yang di-generate | Program / workoutEngine | Todo | Belum diurutkan | Parameter `goal` diterima `generateWorkoutPlan` tapi tidak dipakai sama sekali — reps/sets cuma dipengaruhi `experience` & `week`. Perlu desain rep-range per goal dulu sebelum implementasi |
 
 ## Backlog (belum prioritas)
 
@@ -46,3 +45,5 @@ Update tabel ini setiap kali sebuah task berubah status (lihat aturan di `WORKFL
 | B7 | Sync lintas device: centang exercise & edit program tidak konsisten antar-device | Workout Page / Program | Done | 2 perbaikan: (1) rekonstruksi status dari `exercise_logs` hari ini saat ganti hari/buka halaman, (2) refetch `user_programs` otomatis saat tab kembali aktif (`visibilitychange`). Teruji di 2 browser berbeda |
 | B8 | Bug: sync B7 salah tangkap data lama/tidak terkait (matching cuma pakai nama exercise) | Workout Page | Done | Root cause: `exercise_logs` tidak ada penanda sesi asal. Fix: tambah kolom `workout_log_id` (migrasi DB, sudah dijalankan) + `syncTodayProgressFromDB` sekarang scope ke 1 sesi spesifik via FK, bukan tebak nama+tanggal |
 | D1 | Tukar posisi hari (swap) di Weekly Split Plan | Workout Page / Program | Done | Drag & drop pakai `@dnd-kit/core` (jalan di mouse & touch/HP). Data reps/beban ikut dipindah bareng isi hari, tidak nyangkut seperti bug B6 |
+| B9 | Bug: drag & drop hari bikin data reps/beban nyangkut di device lain / hilang di device asal | Workout Page / Program | Done | 2 perbaikan: (1) device lain bersihkan cache lokal saat versi plan berubah (deteksi via `updated_at`), (2) tambah kolom `plan_reset_at` (migrasi DB) supaya cuma generate ulang beneran yang meng-invalidasi sesi lama — drag & drop/edit tetap mempertahankan histori |
+| B10 | `goal` (Hypertrophy/Strength/Fat Loss/General Fitness) tidak mempengaruhi program yang di-generate | Program / workoutEngine | Done | Strength: reps -3 & rest +30s. Fat Loss: reps +4 & rest -20s. Hypertrophy/General Fitness: baseline dibiarkan. Tergabung benar dengan periodisasi mingguan W1-W4 |

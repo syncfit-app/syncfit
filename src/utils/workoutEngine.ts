@@ -111,12 +111,27 @@ export const generateWorkoutPlan = (exp: Experience, days: number, goal: Goal, w
     return 'RIR 0-1'; 
   };
 
-  // 3. Fungsi Apply Periodisasi (W1 - W4)
+  // 3. Fungsi Apply Periodisasi (W1 - W4) + Target Utama (goal)
   const applyPeriodization = (exercises: GeneratedExercise[]): GeneratedExercise[] => {
     return exercises.map(ex => {
       let currentSets = ex.sets;
       let currentReps = ex.reps;
+      let currentRest = ex.rest;
       let currentRir = getBaselineRIR(exp, ex.isStatic);
+
+      // 3a. Sesuaikan reps & rest berdasarkan Target Utama (goal). Cuma untuk gerakan non-static —
+      // gerakan berbasis durasi (plank dkk) tidak punya konsep rep-range gaya latihan.
+      // Hypertrophy & General Fitness sengaja tidak diubah — baseline di EXERCISE_DB sudah
+      // representatif untuk keduanya (rep range moderat 8-15).
+      if (!ex.isStatic) {
+        if (goal === 'Strength') {
+          currentReps = currentReps.replace(/(\d+)/g, (match) => Math.max(3, parseInt(match) - 3).toString());
+          currentRest = currentRest.replace(/(\d+)/, (match) => (parseInt(match) + 30).toString());
+        } else if (goal === 'Fat Loss') {
+          currentReps = currentReps.replace(/(\d+)/g, (match) => (parseInt(match) + 4).toString());
+          currentRest = currentRest.replace(/(\d+)/, (match) => Math.max(20, parseInt(match) - 20).toString());
+        }
+      }
 
       if (week === 2) {
         currentSets += 1;
@@ -146,6 +161,7 @@ export const generateWorkoutPlan = (exp: Experience, days: number, goal: Goal, w
         ...ex,
         sets: currentSets,
         reps: currentReps,
+        rest: currentRest,
         rir: currentRir
       };
     });
