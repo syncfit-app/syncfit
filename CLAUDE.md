@@ -42,8 +42,8 @@ src/
 - `profiles` — 1:1 dengan `auth.users`. Berisi data fisik user (`age`, `gender`, `weight_kg`, `height_cm`), `locale`, `xp_points`, `streak_count`. **`xp_points` dan `streak_count` tidak pernah ditulis oleh kode manapun saat ini — masih kolom mati.**
 - `user_programs` — 1:1 per user (PK = `user_id`). Berisi `plan_data` (jsonb, array `DayPlan[]` — lihat tipe di `workoutEngine.ts`), `experience`, `days`, `goal`, `current_week` (hanya berubah manual lewat klik tombol minggu di UI, tidak otomatis).
 - `workout_logs` — riwayat sesi workout selesai (per baris = 1 sesi). Diisi oleh `WorkoutView.handleEndSession`.
-- `exercise_logs` — detail per-set dari tiap exercise (per baris = 1 set yang ditandai `completed`). Diisi oleh `WorkoutView.handleEndSession`.
-- `exercises`, `foods`, `gps_activities` — tabel ada di DB tapi **belum dipakai sama sekali** oleh frontend saat ini.
+- `exercise_logs` — detail per-set dari tiap exercise (per baris = 1 set yang ditandai `completed`). Diisi oleh `WorkoutView.handleEndSession`. Punya `workout_log_id` (FK ke `workout_logs.id`, nullable — baris lama sebelum migrasi ini tidak terisi) supaya tiap set log jelas berasal dari sesi mana, dipakai untuk sinkronisasi status centang antar-device.
+- `exercises`, `foods`, `gps_activities` — tabel ada di DB tapi **belum dipakai sama sekali** oleh frontend saat ini. **⚠️ Belum ada RLS di 3 tabel ini** — harus dibereskan dulu sebelum mulai kerja fitur yang memakainya (nutrisi/GPS).
 
 Semua tabel user-data punya `constraint ... foreign KEY (user_id/id) references auth.users (id) on delete CASCADE` dan dilindungi RLS policy. **Jangan pernah query/modify data lintas user** — selalu filter berdasarkan `auth.uid()` di level query atau andalkan RLS.
 

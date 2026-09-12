@@ -1,5 +1,5 @@
 // src/components/WorkoutView.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { supabase } from '../lib/supabase';
 import { 
@@ -74,6 +74,15 @@ export const WorkoutView: React.FC = () => {
   const [formGoal, setFormGoal] = useState<Goal | string>('Hypertrophy');
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [activePlan, setActivePlan] = useState<DayPlan[]>([]);
+  // B8 lanjutan: waktu terakhir plan_data disimpan (generate/regenerate/edit/tukar hari).
+  // Dipakai buat batasi sync cuma ambil sesi yang dicatat SETELAH plan versi ini ada —
+  // supaya sesi lama dengan nama hari yang kebetulan sama tidak ikut nyangkut di plan baru.
+  const [programUpdatedAt, setProgramUpdatedAt] = useState<string | null>(null);
+  // Beda dari programUpdatedAt (berubah tiap kali APAPUN di plan disimpan, termasuk tukar hari) —
+  // planResetAt CUMA berubah saat plan benar-benar di-generate ulang dari nol (isi exercise baru).
+  // Dipakai sebagai batas bawah pencarian sesi lama di syncTodayProgressFromDB, supaya drag & drop
+  // (yang tidak mengubah isi, cuma posisi) tidak ikut menganggap sesi sebelumnya "kadaluarsa".
+  const [planResetAt, setPlanResetAt] = useState<string | null>(null);
 
   // STATE LOKAL
   const [selectedDay, setSelectedDay] = useState(() => {
@@ -127,6 +136,10 @@ export const WorkoutView: React.FC = () => {
   const hasActivePlan = activePlan.length > 0;
   const activeWorkout = activePlan[selectedDay];
 
+  // Nyimpen `updated_at` plan yang TERAKHIR diketahui device ini, di luar re-render (ref, bukan state)
+  // supaya bisa dibandingkan tiap fetchProgram jalan tanpa ikut jadi dependency effect.
+  const lastKnownProgramUpdatedAtRef = useRef<string | null>(null);
+
   useEffect(() => {
     const fetchProgram = async () => {
       try {
@@ -138,7 +151,22 @@ export const WorkoutView: React.FC = () => {
           setFormDays(data.days);
           setFormGoal(data.goal);
           setSelectedWeek(data.current_week);
+
+          // B9: kalau versi plan yang baru di-fetch BEDA dari yang terakhir device ini tahu,
+          // posisi-posisi exercise bisa saja sudah berubah (swap/regenerate/edit — entah dari
+          // device ini sendiri atau device lain). Data centang/reps LOKAL yang lama jadi tidak
+          // bisa dipercaya lagi (kuncinya berbasis posisi, bukan identitas exercise), jadi
+          // dikosongkan dan direkonstruksi ulang dari server lewat syncTodayProgressFromDB
+          // (yang sudah akurat berkat workout_log_id).
+          if (lastKnownProgramUpdatedAtRef.current !== null && lastKnownProgramUpdatedAtRef.current !== data.updated_at) {
+            setExerciseSetLogs({});
+            setCompletedExercises({});
+          }
+          lastKnownProgramUpdatedAtRef.current = data.updated_at;
+
           setActivePlan(data.plan_data);
+          setProgramUpdatedAt(data.updated_at);
+          setPlanResetAt(data.plan_reset_at);
         }
       } catch (error) { console.error(error); } finally { setIsLoading(false); }
     };
@@ -158,7 +186,7 @@ export const WorkoutView: React.FC = () => {
   // 3a: rekonstruksi status "selesai" + reps/beban dari data ASLI server (exercise_logs hari ini),
   // bukan cuma dari localStorage device ini. Query dibatasi ke hari ini saja (created_at >= tengah malam),
   // jadi ukurannya kecil & murah walau dipanggil tiap ganti hari/plan berubah.
-  const syncTodayProgressFromDB = async (day: number, plan: DayPlan[]) => {
+  const syncTodayProgressFromDB = async (day: number, plan: DayPlan[], resetAt: string | null) => {
     const dayPlan = plan[day];
     if (!dayPlan || !dayPlan.exercises || dayPlan.exercises.length === 0) return;
 
@@ -169,11 +197,30 @@ export const WorkoutView: React.FC = () => {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
 
+      // Batas bawah pencarian sesi = mana yang LEBIH BARU antara "awal hari ini" vs
+      // "terakhir plan ini di-generate ulang dari nol" (BUKAN sekadar disimpan/diedit/ditukar).
+      // Drag & drop atau edit exercise TIDAK mengubah planResetAt, jadi sesi lama tetap valid
+      // dicari & dipindahkan ke slot barunya. Cuma generate ulang beneran yang mengganggap
+      // sesi sebelumnya "kadaluarsa".
+      const resetAtDate = resetAt ? new Date(resetAt) : startOfToday;
+      const cutoff = resetAtDate > startOfToday ? resetAtDate : startOfToday;
+
+      const { data: latestSession, error: sessionError } = await supabase
+        .from('workout_logs')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('workout_name', dayPlan.name)
+        .gte('created_at', cutoff.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (sessionError || !latestSession) return;
+
       const { data: todayLogs, error } = await supabase
         .from('exercise_logs')
         .select('exercise_key, set_number, reps_achieved, weight_kg')
-        .eq('user_id', user.id)
-        .gte('created_at', startOfToday.toISOString());
+        .eq('workout_log_id', latestSession.id);
 
       if (error || !todayLogs || todayLogs.length === 0) return;
 
@@ -214,17 +261,29 @@ export const WorkoutView: React.FC = () => {
 
   useEffect(() => {
     if (activePlan.length > 0) {
-      syncTodayProgressFromDB(selectedDay, activePlan);
+      syncTodayProgressFromDB(selectedDay, activePlan, planResetAt);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDay, activePlan]);
+  }, [selectedDay, activePlan, planResetAt]);
 
-  const saveProgramToDB = async (exp: Experience, days: number, goal: string, week: number, plan: DayPlan[]) => {
+  const saveProgramToDB = async (exp: Experience, days: number, goal: string, week: number, plan: DayPlan[], isRegenerate: boolean = false) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase.from('user_programs').upsert({
-      user_id: user.id, experience: exp, days: days, goal: goal, current_week: week, plan_data: plan, updated_at: new Date().toISOString()
-    });
+    const now = new Date().toISOString();
+    const payload: Record<string, unknown> = {
+      user_id: user.id, experience: exp, days: days, goal: goal, current_week: week, plan_data: plan, updated_at: now
+    };
+    // Cuma sertakan plan_reset_at kalau ini benar-benar generate ulang dari nol (isi exercise baru).
+    // Kalau tidak disertakan, Supabase upsert TIDAK menimpa nilai lama di kolom ini.
+    if (isRegenerate) payload.plan_reset_at = now;
+
+    await supabase.from('user_programs').upsert(payload);
+    setProgramUpdatedAt(now);
+    if (isRegenerate) setPlanResetAt(now);
+    // Device ini sendiri yang barusan bikin perubahan ini — catat di ref juga, supaya
+    // fetch berikutnya (misal lewat visibilitychange) tidak salah kira ini "perubahan asing"
+    // dari device lain dan tidak perlu ikut menghapus data lokal yang sudah benar.
+    lastKnownProgramUpdatedAtRef.current = now;
   };
 
   useEffect(() => { localStorage.setItem('sfit_selected_day', JSON.stringify(selectedDay)); }, [selectedDay]);
@@ -245,14 +304,14 @@ export const WorkoutView: React.FC = () => {
   const handleGeneratePlan = async () => {
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, selectedWeek);
     setActivePlan(newPlan); setCompletedExercises({}); setExerciseSetLogs({}); setIsConfigModalOpen(false); setSelectedDay(0);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlan);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlan, true);
   };
 
   const handleWeekChange = async (week: number) => {
     setSelectedWeek(week);
     const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, week);
     setActivePlan(newPlan); setCompletedExercises({}); setExerciseSetLogs({}); setSelectedDay(0);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, week, newPlan);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, week, newPlan, true);
   };
 
   // D1: sensor drag pakai PointerSensor (nyala di mouse & touch/HP).
@@ -491,18 +550,21 @@ export const WorkoutView: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      const { error: workoutError } = await supabase.from('workout_logs').insert({
+      // .select().single() supaya kita dapat balik `id` baris workout_logs yang baru dibuat —
+      // dipakai sebagai workout_log_id di exercise_logs, jadi tiap set log jelas terhubung
+      // ke sesi spesifik ini (bukan cuma dicocokkan lewat nama exercise + tanggal seperti sebelumnya).
+      const { data: workoutLogRow, error: workoutError } = await supabase.from('workout_logs').insert({
         user_id: user.id,
         workout_name: payload.workout_name,
         duration_seconds: payload.duration_seconds,
         calories_burned: payload.calories_burned,
         exercises_completed: payload.exercises_completed,
-      });
+      }).select('id').single();
       if (workoutError) throw workoutError;
 
       if (payload.set_logs.length > 0) {
         const { error: setError } = await supabase.from('exercise_logs').insert(
-          payload.set_logs.map(s => ({ user_id: user.id, ...s }))
+          payload.set_logs.map(s => ({ user_id: user.id, workout_log_id: workoutLogRow.id, ...s }))
         );
         if (setError) throw setError;
       }
@@ -892,7 +954,6 @@ export const WorkoutView: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 relative shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-2 text-[#FF5E00]">
-                  <Wand2 className="w-6 h-6" />
                   <h3 className="font-black text-[#111827] text-lg">Konfigurasi Program</h3>
                 </div>
                 <button onClick={() => setIsConfigModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
