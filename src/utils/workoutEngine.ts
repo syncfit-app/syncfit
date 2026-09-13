@@ -95,7 +95,7 @@ const getFullBodyPool = (variant: 'A' | 'B' | 'C'): GeneratedExercise[] => {
   }
 };
 
-export const generateWorkoutPlan = (exp: Experience, days: number, goal: Goal, week: number = 1): DayPlan[] => {
+export const generateWorkoutPlan = (exp: Experience, days: number, goal: string, week: number = 1): DayPlan[] => {
   const plan: DayPlan[] = [];
   
   // 1. Menentukan Jumlah Gerakan berdasarkan Pengalaman
@@ -121,13 +121,16 @@ export const generateWorkoutPlan = (exp: Experience, days: number, goal: Goal, w
 
       // 3a. Sesuaikan reps & rest berdasarkan Target Utama (goal). Cuma untuk gerakan non-static —
       // gerakan berbasis durasi (plank dkk) tidak punya konsep rep-range gaya latihan.
-      // Hypertrophy & General Fitness sengaja tidak diubah — baseline di EXERCISE_DB sudah
-      // representatif untuk keduanya (rep range moderat 8-15).
+      // Hypertrophy, General Fitness, & goal custom (misal "Hybrid") sengaja tidak diubah —
+      // baseline di EXERCISE_DB sudah representatif, dan untuk goal custom aplikasi memang
+      // tidak tahu penyesuaian numerik yang tepat. Perbandingan case-insensitive supaya
+      // "strength"/"STRENGTH"/"Strength" tetap dianggap sama.
+      const normalizedGoal = goal.trim().toLowerCase();
       if (!ex.isStatic) {
-        if (goal === 'Strength') {
+        if (normalizedGoal === 'strength') {
           currentReps = currentReps.replace(/(\d+)/g, (match) => Math.max(3, parseInt(match) - 3).toString());
           currentRest = currentRest.replace(/(\d+)/, (match) => (parseInt(match) + 30).toString());
-        } else if (goal === 'Fat Loss') {
+        } else if (normalizedGoal === 'fat loss') {
           currentReps = currentReps.replace(/(\d+)/g, (match) => (parseInt(match) + 4).toString());
           currentRest = currentRest.replace(/(\d+)/, (match) => Math.max(20, parseInt(match) - 20).toString());
         }

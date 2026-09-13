@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download,
-  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2, GripVertical
+  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2, GripVertical, Upload, FileWarning
 } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
@@ -34,6 +34,113 @@ interface PendingSession {
 }
 
 const PENDING_SESSION_KEY = 'sfit_pending_session';
+
+// D2: format file export/import program latihan.
+const SYNCFIT_FILE_FORMAT = 'syncfit-program';
+const SYNCFIT_FILE_VERSION = 1;
+const VALID_EXPERIENCES: Experience[] = ['Pemula', 'Menengah', 'Mahir'];
+const VALID_GOALS: Goal[] = ['Hypertrophy', 'Strength', 'Fat Loss', 'General Fitness'];
+
+interface SyncFitProgramFile {
+  format: string;
+  version: number;
+  exported_at: string;
+  program: {
+    experience: Experience;
+    days: number;
+    goal: string;
+    plan_data: Record<string, DayPlan[]>;
+  };
+}
+
+// Validasi KETAT sebelum data dari file .syncfit dipakai — file ini datang dari luar (bisa dari
+// siapa saja), jadi tidak boleh dipercaya begitu saja. Prinsipnya: JSON.parse saja (tidak pernah
+// eval/Function), lalu setiap field dicek tipe & isinya satu-satu. Kalau ada yang tidak sesuai,
+// field itu ditolak/dikosongkan — bukan bikin seluruh import gagal, kecuali struktur intinya rusak.
+// Perhatian khusus di `videoUrl`: field ini dipakai sebagai src <iframe>, jadi HARUS dibatasi cuma
+// domain video yang dipercaya (youtube embed) — kalau tidak, file jahat bisa menyisipkan URL
+// berbahaya yang jalan begitu user klik "Demo".
+const isTrustedVideoUrl = (url: unknown): url is string => {
+  if (typeof url !== 'string' || url.trim() === '') return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === 'https:' &&
+      (parsed.hostname === 'www.youtube.com' || parsed.hostname === 'www.youtube-nocookie.com') &&
+      parsed.pathname.startsWith('/embed/')
+    );
+  } catch {
+    return false;
+  }
+};
+
+const sanitizeString = (val: unknown, maxLen: number, fallback = ''): string => {
+  if (typeof val !== 'string') return fallback;
+  return val.slice(0, maxLen);
+};
+
+const sanitizeExercise = (raw: unknown): GeneratedExercise | null => {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const name = sanitizeString(r.name, 80);
+  if (!name) return null;
+
+  const setsNum = Number(r.sets);
+  const sets = Number.isFinite(setsNum) ? Math.min(20, Math.max(1, Math.round(setsNum))) : 3;
+
+  return {
+    name,
+    sets,
+    reps: sanitizeString(r.reps, 20, '10'),
+    rir: r.rir ? sanitizeString(r.rir, 20) : undefined,
+    rest: sanitizeString(r.rest, 20, '60s'),
+    videoUrl: isTrustedVideoUrl(r.videoUrl) ? r.videoUrl : undefined,
+    note: r.note ? sanitizeString(r.note, 300) : undefined,
+    isStatic: r.isStatic === true,
+  };
+};
+
+const sanitizeDayPlan = (raw: unknown): DayPlan | null => {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const name = sanitizeString(r.name, 60, 'Hari');
+  const type = r.type === 'Rest' ? 'Rest' : 'Workout';
+  const exercisesRaw = Array.isArray(r.exercises) ? r.exercises : [];
+  const exercises = exercisesRaw.slice(0, 20).map(sanitizeExercise).filter((e): e is GeneratedExercise => e !== null);
+  return { name, type, exercises };
+};
+
+// Return null kalau filenya memang bukan/rusak format syncfit-program — bukan exception,
+// supaya alur pemanggil tinggal cek null tanpa try/catch bertingkat.
+const validateSyncFitProgramFile = (raw: unknown): SyncFitProgramFile['program'] | null => {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (r.format !== SYNCFIT_FILE_FORMAT) return null;
+  if (typeof r.version !== 'number' || r.version > SYNCFIT_FILE_VERSION) return null;
+  if (typeof r.program !== 'object' || r.program === null) return null;
+
+  const p = r.program as Record<string, unknown>;
+  const experience: Experience = VALID_EXPERIENCES.includes(p.experience as Experience) ? (p.experience as Experience) : 'Pemula';
+  // Goal sekarang teks bebas (bisa custom seperti "Hybrid") — cukup disanitasi (dibatasi panjang),
+  // tidak perlu cocok persis salah satu dari 4 goal standar.
+  const sanitizedGoal = sanitizeString(p.goal, 40);
+  const goal: string = sanitizedGoal.trim() !== '' ? sanitizedGoal : 'General Fitness';
+  const daysNum = Number(p.days);
+  const days = Number.isFinite(daysNum) ? Math.min(6, Math.max(2, Math.round(daysNum))) : 4;
+
+  if (typeof p.plan_data !== 'object' || p.plan_data === null) return null;
+
+  const planData: Record<string, DayPlan[]> = {};
+  for (const week of ['1', '2', '3', '4']) {
+    const weekRaw = (p.plan_data as Record<string, unknown>)[week];
+    if (!Array.isArray(weekRaw)) return null;
+    const sanitizedDays = weekRaw.slice(0, 7).map(sanitizeDayPlan).filter((d): d is DayPlan => d !== null);
+    if (sanitizedDays.length === 0) return null;
+    planData[week] = sanitizedDays;
+  }
+
+  return { experience, days, goal, plan_data: planData };
+};
 
 // D1: kartu hari di "Weekly Split Plan" — bisa di-drag DAN jadi target drop sekaligus,
 // supaya hari manapun bisa ditukar dengan hari manapun. Pakai @dnd-kit/core karena
@@ -118,6 +225,11 @@ export const WorkoutView: React.FC = () => {
 
   // MODALS & FORM
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  // D2: hasil parsing file .syncfit yang sudah lolos validasi, menunggu konfirmasi user
+  // sebelum benar-benar dipakai menimpa program (supaya user tidak kaget program lama hilang).
+  const [pendingImport, setPendingImport] = useState<{ experience: Experience; days: number; goal: string; plan_data: Record<string, DayPlan[]> } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDemo, setActiveDemo] = useState<GeneratedExercise | null>(null);
   const [isRecapModalOpen, setIsRecapModalOpen] = useState(false);
   const [workoutStats, setWorkoutStats] = useState({ duration: 0, calories: 0, date: '' });
@@ -357,6 +469,85 @@ export const WorkoutView: React.FC = () => {
     setSelectedWeek(week);
     setSelectedDay(0);
     saveCurrentWeekPreference(week);
+  };
+
+  // D2: export program (4 minggu penuh) jadi file .syncfit yang bisa dibagikan.
+  // Isinya cuma template latihan (nama/sets/reps/rest) — TIDAK PERNAH menyertakan riwayat
+  // beban/reps yang sudah dijalani (itu tersimpan terpisah di exercise_logs, tidak pernah
+  // disentuh fungsi ini), jadi otomatis "bersih" untuk siapapun yang meng-import-nya.
+  const handleExportProgram = () => {
+    if (Object.keys(planByWeek).length === 0) return;
+    const fileData: SyncFitProgramFile = {
+      format: SYNCFIT_FILE_FORMAT,
+      version: SYNCFIT_FILE_VERSION,
+      exported_at: new Date().toISOString(),
+      program: {
+        experience: formExp,
+        days: formDays,
+        goal: formGoal as Goal,
+        plan_data: planByWeek,
+      },
+    };
+    const blob = new Blob([JSON.stringify(fileData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `syncfit-program-${formGoal.toLowerCase().replace(/\s+/g, '-')}-${dateStr}.syncfit`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Baca file yang dipilih user, JSON.parse (TIDAK PERNAH eval/Function — parser JSON bawaan
+  // browser tidak bisa mengeksekusi kode apapun), lalu validasi ketat sebelum ditampilkan
+  // sebagai preview konfirmasi. Belum langsung menimpa program apapun di sini.
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // reset input, supaya pilih file yang sama 2x tetap kepicu onChange
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.syncfit')) {
+      setImportError('File harus berformat .syncfit');
+      return;
+    }
+    if (file.size > 500 * 1024) {
+      setImportError('Ukuran file terlalu besar untuk sebuah program latihan (maks 500KB).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(reader.result as string);
+        const validated = validateSyncFitProgramFile(raw);
+        if (!validated) {
+          setImportError('File tidak valid atau bukan format program SyncFit yang dikenali.');
+          return;
+        }
+        setImportError(null);
+        setPendingImport(validated);
+      } catch {
+        setImportError('File rusak atau bukan format JSON yang valid.');
+      }
+    };
+    reader.onerror = () => setImportError('Gagal membaca file.');
+    reader.readAsText(file);
+  };
+
+  // User sudah lihat preview & konfirmasi — baru sekarang program diterapkan & disimpan.
+  // Diperlakukan sama seperti "Generate Program" (reset total, plan_reset_at diperbarui),
+  // karena ini memang menimpa seluruh 4 minggu dengan program yang benar-benar baru.
+  const handleConfirmImport = async () => {
+    if (!pendingImport) return;
+    const { experience, days, goal, plan_data } = pendingImport;
+    setFormExp(experience); setFormDays(days); setFormGoal(goal);
+    setPlanByWeek(plan_data);
+    setCompletedExercises({}); setExerciseSetLogs({});
+    setIsConfigModalOpen(false); setSelectedDay(0); setSelectedWeek(1);
+    setPendingImport(null);
+    await saveProgramToDB(experience, days, goal, 1, plan_data, true);
   };
 
   // D1: sensor drag pakai PointerSensor (nyala di mouse & touch/HP).
@@ -732,11 +923,25 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
+      {/* D2: input file tersembunyi, dipakai bareng oleh semua tombol "Import" di halaman ini */}
+      <input ref={fileInputRef} type="file" accept=".syncfit" onChange={handleFileSelected} className="hidden" />
+
+      {importError && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3 animate-fade-in">
+          <FileWarning className="w-5 h-5 text-red-500 shrink-0" />
+          <p className="text-sm font-bold text-red-700 flex-1">{importError}</p>
+          <button onClick={() => setImportError(null)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
       {!hasActivePlan ? (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 space-y-6 animate-fade-in">
           <div className="w-24 h-24 bg-orange-500/10 rounded-full flex items-center justify-center mb-2"><Wand2 className="w-12 h-12 text-[#FF5E00]" /></div>
           <div className="space-y-2 max-w-md"><h1 className="text-3xl font-black text-[#111827]">Belum Ada Program</h1><p className="text-sm text-slate-500 font-medium">SyncFit akan merancang jadwal mingguan dan periodisasi progresif yang disesuaikan.</p></div>
-          <button onClick={() => setIsConfigModalOpen(true)} className="bg-[#FF5E00] hover:bg-[#E05300] text-white py-4 px-8 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 hover:scale-105"><Zap className="w-5 h-5 fill-current" /><span>Rancang Program Sekarang</span></button>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <button onClick={() => setIsConfigModalOpen(true)} className="bg-[#FF5E00] hover:bg-[#E05300] text-white py-4 px-8 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 hover:scale-105"><Zap className="w-5 h-5 fill-current" /><span>Rancang Program Sekarang</span></button>
+            <button onClick={() => fileInputRef.current?.click()} className="bg-white text-slate-700 border border-slate-200 py-4 px-8 rounded-2xl font-black transition-all flex items-center justify-center gap-2 hover:bg-slate-50"><Upload className="w-5 h-5" /><span>Import dari File</span></button>
+          </div>
         </div>
       ) : (
         <div className="animate-fade-in space-y-6">
@@ -749,25 +954,34 @@ export const WorkoutView: React.FC = () => {
                   <span className="bg-[#FF5E00]/20 border border-[#FF5E00]/40 px-3 py-1 rounded-full text-[10px] sm:text-xs font-black text-[#FF5E00] uppercase tracking-wider">Minggu {selectedWeek}</span>
                   <span className="bg-slate-800 border border-slate-700 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider">{formExp}</span>
                   
-                  {/* EDIT GOAL INLINE */}
+                  {/* EDIT GOAL INLINE — input teks bebas, bukan dropdown, biar user bisa isi goal sendiri (misal "Hybrid") */}
                   {isEditingGoal ? (
-                    <div className="flex items-center gap-1.5 bg-slate-800 p-1 rounded-full border border-indigo-500/50">
-                      <select
-                        value={tempGoal}
-                        onChange={(e) => setTempGoal(e.target.value)}
-                        className="bg-transparent text-indigo-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none"
-                      >
-                        <option value="Hypertrophy" className="bg-slate-900 text-white">Hypertrophy</option>
-                        <option value="Strength" className="bg-slate-900 text-white">Strength</option>
-                        <option value="Fat Loss" className="bg-slate-900 text-white">Fat Loss</option>
-                        <option value="General Fitness" className="bg-slate-900 text-white">General Fitness</option>
-                      </select>
-                      <button onClick={handleSaveGoal} className="bg-indigo-600 hover:bg-indigo-500 text-white p-1 rounded-full transition-colors">
-                        <Check className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => setIsEditingGoal(false)} className="bg-slate-700 hover:bg-slate-600 text-slate-300 p-1 rounded-full transition-colors">
-                        <X className="w-3 h-3" />
-                      </button>
+                    <div className="flex flex-col gap-1.5 bg-slate-800 p-2 rounded-2xl border border-indigo-500/50">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={tempGoal}
+                          onChange={(e) => setTempGoal(e.target.value)}
+                          maxLength={40}
+                          placeholder="Nama goal, misal: Hybrid"
+                          className="bg-transparent text-indigo-300 text-xs font-bold rounded-lg px-2 py-0.5 focus:outline-none w-36"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveGoal()}
+                        />
+                        <button onClick={handleSaveGoal} className="bg-indigo-600 hover:bg-indigo-500 text-white p-1 rounded-full transition-colors shrink-0">
+                          <Check className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => setIsEditingGoal(false)} className="bg-slate-700 hover:bg-slate-600 text-slate-300 p-1 rounded-full transition-colors shrink-0">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1 px-1">
+                        {VALID_GOALS.map(gl => (
+                          <button key={gl} onClick={() => setTempGoal(gl)} className="text-[9px] font-bold text-slate-400 hover:text-indigo-300 bg-slate-900/60 px-2 py-0.5 rounded-full transition-colors">
+                            {gl}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <span className="bg-indigo-500/20 border border-indigo-500/40 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -797,6 +1011,7 @@ export const WorkoutView: React.FC = () => {
               </div>
               <div className="flex flex-row items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
                 <button onClick={() => setIsConfigModalOpen(true)} className="bg-slate-800 text-slate-200 p-3.5 rounded-xl font-bold border border-slate-700 shrink-0"><Settings2 className="w-5 h-5" /></button>
+                <button onClick={handleExportProgram} title="Export program jadi file .syncfit" className="bg-slate-800 text-slate-200 p-3.5 rounded-xl font-bold border border-slate-700 shrink-0"><Download className="w-5 h-5" /></button>
                 {activeWorkout?.type !== 'Rest' && (
                   <button onClick={handleStartSession} disabled={isWorkoutActive} className={`w-full md:w-auto py-3.5 px-6 rounded-xl font-black flex items-center justify-center gap-2 ${isWorkoutActive ? 'bg-slate-800 text-slate-500 border border-slate-700' : 'bg-[#FF5E00] text-white hover:scale-105'}`}>
                     {isWorkoutActive ? <><span className="w-2 h-2 rounded-full bg-emerald-50 animate-pulse"></span><span>Sesi Berjalan</span></> : <><Play className="w-5 h-5" /><span>Mulai Latihan</span></>}
@@ -1045,17 +1260,64 @@ export const WorkoutView: React.FC = () => {
 
                <div className="space-y-2">
                  <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Target Utama</label>
-                 <div className="grid grid-cols-2 gap-2">
-                   {(['Hypertrophy', 'Strength', 'Fat Loss', 'General Fitness'] as Goal[]).map((gl) => (
-                     <button key={gl} onClick={() => setFormGoal(gl)} className={`py-3 px-2 text-xs font-bold rounded-xl border transition-all ${formGoal === gl ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white text-slate-500 border-slate-200'}`}>{gl}</button>
+                 <input
+                   type="text"
+                   value={formGoal}
+                   onChange={(e) => setFormGoal(e.target.value)}
+                   maxLength={40}
+                   placeholder="Misal: Strength, atau goal sendiri seperti Hybrid"
+                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-[#111827] focus:outline-none focus:border-[#FF5E00]"
+                 />
+                 <div className="flex flex-wrap gap-1.5 pt-1">
+                   {VALID_GOALS.map((gl) => (
+                     <button key={gl} onClick={() => setFormGoal(gl)} className={`py-1.5 px-3 text-[11px] font-bold rounded-full border transition-all ${formGoal === gl ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{gl}</button>
                    ))}
                  </div>
+                 <p className="text-[10px] text-slate-400 font-medium pt-0.5">Pilih salah satu di atas supaya reps & rest otomatis disesuaikan (Strength/Fat Loss). Goal custom tetap bisa dipakai, cuma tanpa penyesuaian otomatis itu.</p>
                </div>
              </div>
 
              <button onClick={handleGeneratePlan} className="w-full bg-[#111827] hover:bg-slate-800 text-white py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 mt-2">
                Simpan & Rancang Jadwal
              </button>
+             <button onClick={() => { setIsConfigModalOpen(false); fileInputRef.current?.click(); }} className="w-full bg-white text-slate-600 border border-slate-200 py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 hover:bg-slate-50">
+               <Upload className="w-4 h-4" /> Atau Import dari File .syncfit
+             </button>
+          </div>
+        </div>
+      )}
+
+      {/* D2: MODAL KONFIRMASI IMPORT — preview dulu sebelum menimpa program yang ada */}
+      {pendingImport && (
+        <div className="fixed inset-0 bg-[#111827]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 relative shadow-2xl animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <Upload className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-[#111827] text-lg">Import Program Ini?</h3>
+                <p className="text-xs text-slate-500 font-medium">Program yang sedang aktif akan digantikan sepenuhnya.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500 font-medium">Pengalaman</span><span className="font-bold text-[#111827]">{pendingImport.experience}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500 font-medium">Hari/minggu</span><span className="font-bold text-[#111827]">{pendingImport.days} hari</span></div>
+              <div className="flex justify-between"><span className="text-slate-500 font-medium">Target Utama</span><span className="font-bold text-[#111827]">{pendingImport.goal}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500 font-medium">Cakupan</span><span className="font-bold text-[#111827]">4 minggu (W1-W4)</span></div>
+            </div>
+
+            <p className="text-xs text-slate-400 font-medium">Progres/reps/beban yang sudah kamu catat sebelumnya di program lama tidak akan terhapus dari riwayat, tapi tidak akan tersambung ke program baru ini.</p>
+
+            <div className="flex gap-3">
+              <button onClick={() => setPendingImport(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 transition-colors rounded-2xl text-slate-600 font-black text-sm">
+                Batal
+              </button>
+              <button onClick={handleConfirmImport} className="flex-1 py-3.5 bg-[#FF5E00] hover:bg-[#E05300] transition-colors rounded-2xl text-white font-black text-sm">
+                Ya, Import
+              </button>
+            </div>
           </div>
         </div>
       )}
