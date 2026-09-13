@@ -21,6 +21,7 @@ export interface SetDetail {
 // Disimpan utuh di localStorage saat gagal terkirim, supaya bisa di-retry tanpa hitung ulang / kehilangan data.
 interface PendingSession {
   workout_name: string;
+  week: number;
   duration_seconds: number;
   calories_burned: number;
   exercises_completed: string[];
@@ -73,15 +74,20 @@ export const WorkoutView: React.FC = () => {
   const [formDays, setFormDays] = useState(4);
   const [formGoal, setFormGoal] = useState<Goal | string>('Hypertrophy');
   const [selectedWeek, setSelectedWeek] = useState(1);
-  const [activePlan, setActivePlan] = useState<DayPlan[]>([]);
+  // D2-lanjutan: plan_data sekarang menyimpan SEMUA 4 minggu sekaligus (bukan cuma minggu aktif),
+  // supaya kustomisasi (tukar hari/edit exercise) di 1 minggu TIDAK mempengaruhi minggu lain.
+  // "activePlan" di bawah cuma cara pandang (view) ke minggu yang sedang dibuka.
+  const [planByWeek, setPlanByWeek] = useState<Record<number, DayPlan[]>>({});
+  const activePlan = planByWeek[selectedWeek] || [];
   // B8 lanjutan: waktu terakhir plan_data disimpan (generate/regenerate/edit/tukar hari).
   // Dipakai buat batasi sync cuma ambil sesi yang dicatat SETELAH plan versi ini ada —
   // supaya sesi lama dengan nama hari yang kebetulan sama tidak ikut nyangkut di plan baru.
   const [programUpdatedAt, setProgramUpdatedAt] = useState<string | null>(null);
   // Beda dari programUpdatedAt (berubah tiap kali APAPUN di plan disimpan, termasuk tukar hari) —
-  // planResetAt CUMA berubah saat plan benar-benar di-generate ulang dari nol (isi exercise baru).
-  // Dipakai sebagai batas bawah pencarian sesi lama di syncTodayProgressFromDB, supaya drag & drop
-  // (yang tidak mengubah isi, cuma posisi) tidak ikut menganggap sesi sebelumnya "kadaluarsa".
+  // planResetAt CUMA berubah saat plan benar-benar di-generate ulang dari nol (isi exercise baru,
+  // 4 minggu sekaligus). Dipakai sebagai batas bawah pencarian sesi lama di syncTodayProgressFromDB,
+  // supaya drag & drop/edit (yang tidak mengubah isi, cuma posisi/1 minggu) tidak ikut menganggap
+  // sesi sebelumnya "kadaluarsa".
   const [planResetAt, setPlanResetAt] = useState<string | null>(null);
 
   // STATE LOKAL
@@ -89,11 +95,14 @@ export const WorkoutView: React.FC = () => {
     const saved = localStorage.getItem('sfit_selected_day');
     return saved ? JSON.parse(saved) : 0;
   });
-  const [completedExercises, setCompletedExercises] = useState<Record<number, number[]>>(() => {
+  // Key sekarang sertakan nomor minggu (`${week}-${day}`) — supaya centang di W1 tidak
+  // pernah kebaca sebagai centang di W2-W4, walau hari & indeks exercise-nya sama.
+  const [completedExercises, setCompletedExercises] = useState<Record<string, number[]>>(() => {
     const saved = localStorage.getItem('sfit_completed_exercises');
     return saved ? JSON.parse(saved) : {};
   });
 
+  // Key sekarang `${week}-${day}-${exerciseIdx}` dengan alasan yang sama seperti di atas.
   const [exerciseSetLogs, setExerciseSetLogs] = useState<Record<string, SetDetail[]>>(() => {
     const saved = localStorage.getItem('sfit_set_logs');
     return saved ? JSON.parse(saved) : {};
@@ -164,7 +173,21 @@ export const WorkoutView: React.FC = () => {
           }
           lastKnownProgramUpdatedAtRef.current = data.updated_at;
 
-          setActivePlan(data.plan_data);
+          // Migrasi otomatis format lama: dulu plan_data cuma array 7 hari (1 minggu).
+          // Kalau ketemu format lama, minggu yang sedang aktif dipertahankan isinya,
+          // minggu lain di-generate baru (supaya tetap lengkap 4 minggu tanpa data hilang).
+          if (Array.isArray(data.plan_data)) {
+            const migrated: Record<number, DayPlan[]> = {};
+            for (let w = 1; w <= 4; w++) {
+              migrated[w] = w === data.current_week
+                ? data.plan_data
+                : generateWorkoutPlan(data.experience as Experience, data.days, data.goal as Goal, w);
+            }
+            setPlanByWeek(migrated);
+          } else {
+            setPlanByWeek(data.plan_data || {});
+          }
+
           setProgramUpdatedAt(data.updated_at);
           setPlanResetAt(data.plan_reset_at);
         }
@@ -184,9 +207,10 @@ export const WorkoutView: React.FC = () => {
   }, []);
 
   // 3a: rekonstruksi status "selesai" + reps/beban dari data ASLI server (exercise_logs hari ini),
-  // bukan cuma dari localStorage device ini. Query dibatasi ke hari ini saja (created_at >= tengah malam),
-  // jadi ukurannya kecil & murah walau dipanggil tiap ganti hari/plan berubah.
-  const syncTodayProgressFromDB = async (day: number, plan: DayPlan[], resetAt: string | null) => {
+  // bukan cuma dari localStorage device ini. Query dibatasi ke hari ini saja (created_at >= tengah malam)
+  // DAN ke minggu yang sedang dibuka (`week`), jadi centang di W1 tidak pernah kebaca sebagai
+  // centang di W2-W4 walau nama harinya kebetulan sama.
+  const syncTodayProgressFromDB = async (week: number, day: number, plan: DayPlan[], resetAt: string | null) => {
     const dayPlan = plan[day];
     if (!dayPlan || !dayPlan.exercises || dayPlan.exercises.length === 0) return;
 
@@ -210,6 +234,7 @@ export const WorkoutView: React.FC = () => {
         .select('id')
         .eq('user_id', user.id)
         .eq('workout_name', dayPlan.name)
+        .eq('week', week)
         .gte('created_at', cutoff.toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
@@ -230,7 +255,7 @@ export const WorkoutView: React.FC = () => {
           const serverSets = todayLogs.filter(l => l.exercise_key === ex.name);
           if (serverSets.length === 0) return;
 
-          const key = `${day}-${idx}`;
+          const key = `${week}-${day}-${idx}`;
           const existing = updated[key] || [];
           const merged: SetDetail[] = Array.from({ length: ex.sets }, (_, i) => existing[i] || { weight: '', reps: '', completed: false });
           serverSets.forEach(s => {
@@ -247,12 +272,13 @@ export const WorkoutView: React.FC = () => {
       });
 
       setCompletedExercises(prev => {
-        const updatedDay = new Set(prev[day] || []);
+        const dayKey = `${week}-${day}`;
+        const updatedDay = new Set(prev[dayKey] || []);
         dayPlan.exercises.forEach((ex, idx) => {
           const serverSetsCount = todayLogs.filter(l => l.exercise_key === ex.name).length;
           if (serverSetsCount >= ex.sets) updatedDay.add(idx);
         });
-        return { ...prev, [day]: Array.from(updatedDay) };
+        return { ...prev, [dayKey]: Array.from(updatedDay) };
       });
     } catch (e) {
       console.error('Gagal sinkronisasi progres hari ini:', e);
@@ -261,17 +287,19 @@ export const WorkoutView: React.FC = () => {
 
   useEffect(() => {
     if (activePlan.length > 0) {
-      syncTodayProgressFromDB(selectedDay, activePlan, planResetAt);
+      syncTodayProgressFromDB(selectedWeek, selectedDay, activePlan, planResetAt);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDay, activePlan, planResetAt]);
+  }, [selectedWeek, selectedDay, activePlan, planResetAt]);
 
-  const saveProgramToDB = async (exp: Experience, days: number, goal: string, week: number, plan: DayPlan[], isRegenerate: boolean = false) => {
+  // Sekarang selalu menyimpan SELURUH plan 4 minggu (bukan cuma minggu yang sedang dibuka) —
+  // supaya minggu lain yang tidak diubah tetap utuh, tidak ikut tertimpa/hilang.
+  const saveProgramToDB = async (exp: Experience, days: number, goal: string, week: number, fullPlanByWeek: Record<number, DayPlan[]>, isRegenerate: boolean = false) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const now = new Date().toISOString();
     const payload: Record<string, unknown> = {
-      user_id: user.id, experience: exp, days: days, goal: goal, current_week: week, plan_data: plan, updated_at: now
+      user_id: user.id, experience: exp, days: days, goal: goal, current_week: week, plan_data: fullPlanByWeek, updated_at: now
     };
     // Cuma sertakan plan_reset_at kalau ini benar-benar generate ulang dari nol (isi exercise baru).
     // Kalau tidak disertakan, Supabase upsert TIDAK menimpa nilai lama di kolom ini.
@@ -284,6 +312,15 @@ export const WorkoutView: React.FC = () => {
     // fetch berikutnya (misal lewat visibilitychange) tidak salah kira ini "perubahan asing"
     // dari device lain dan tidak perlu ikut menghapus data lokal yang sudah benar.
     lastKnownProgramUpdatedAtRef.current = now;
+  };
+
+  // Untuk sekadar pindah tab minggu (BUKAN edit isi) — cuma update current_week,
+  // TIDAK menyentuh plan_data/updated_at/plan_reset_at sama sekali. Jadi tidak memicu
+  // sinkronisasi lokal dianggap "berubah" di device lain, dan tidak menghapus cache manapun.
+  const saveCurrentWeekPreference = async (week: number) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('user_programs').update({ current_week: week }).eq('user_id', user.id);
   };
 
   useEffect(() => { localStorage.setItem('sfit_selected_day', JSON.stringify(selectedDay)); }, [selectedDay]);
@@ -301,17 +338,25 @@ export const WorkoutView: React.FC = () => {
     return () => clearInterval(interval);
   }, [isWorkoutActive, sessionStartTime]);
 
+  // Generate program = generate SELURUH 4 minggu sekaligus (1 program bulanan yang koheren),
+  // bukan cuma minggu yang sedang dibuka. Ini satu-satunya aksi yang benar-benar "mulai dari nol".
   const handleGeneratePlan = async () => {
-    const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, selectedWeek);
-    setActivePlan(newPlan); setCompletedExercises({}); setExerciseSetLogs({}); setIsConfigModalOpen(false); setSelectedDay(0);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlan, true);
+    const newPlanByWeek: Record<number, DayPlan[]> = {};
+    for (let w = 1; w <= 4; w++) {
+      newPlanByWeek[w] = generateWorkoutPlan(formExp, formDays, formGoal as Goal, w);
+    }
+    setPlanByWeek(newPlanByWeek);
+    setCompletedExercises({}); setExerciseSetLogs({}); setIsConfigModalOpen(false); setSelectedDay(0); setSelectedWeek(1);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, 1, newPlanByWeek, true);
   };
 
-  const handleWeekChange = async (week: number) => {
+  // Pindah minggu sekarang MURNI ganti tampilan — setiap minggu sudah punya isinya sendiri
+  // (hasil generate awal atau kustomisasi manual), jadi tidak perlu generate ulang / tulis
+  // plan_data sama sekali. Cukup catat preferensi "terakhir buka minggu berapa" secara ringan.
+  const handleWeekChange = (week: number) => {
     setSelectedWeek(week);
-    const newPlan = generateWorkoutPlan(formExp, formDays, formGoal as Goal, week);
-    setActivePlan(newPlan); setCompletedExercises({}); setExerciseSetLogs({}); setSelectedDay(0);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, week, newPlan, true);
+    setSelectedDay(0);
+    saveCurrentWeekPreference(week);
   };
 
   // D1: sensor drag pakai PointerSensor (nyala di mouse & touch/HP).
@@ -321,36 +366,44 @@ export const WorkoutView: React.FC = () => {
   // Tukar 2 hari SEKALIGUS isinya (nama, exercise, dst) DAN data yang sudah tercatat untuk hari itu
   // (completedExercises + exerciseSetLogs) — kalau cuma isi hari yang ditukar tanpa datanya ikut,
   // akan muncul bug yang sama persis seperti B6 (reps/beban nyangkut di slot yang salah).
+  // Cuma mempengaruhi MINGGU YANG SEDANG DIBUKA — minggu lain tidak ikut berubah.
   const handleSwapDays = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
 
-    const newPlan = [...activePlan];
-    [newPlan[fromIndex], newPlan[toIndex]] = [newPlan[toIndex], newPlan[fromIndex]];
-    setActivePlan(newPlan);
+    const newWeekPlan = [...activePlan];
+    [newWeekPlan[fromIndex], newWeekPlan[toIndex]] = [newWeekPlan[toIndex], newWeekPlan[fromIndex]];
+    const newPlanByWeek = { ...planByWeek, [selectedWeek]: newWeekPlan };
+    setPlanByWeek(newPlanByWeek);
 
     setCompletedExercises(prev => {
       const updated = { ...prev };
-      const fromVal = updated[fromIndex] || [];
-      const toVal = updated[toIndex] || [];
-      updated[fromIndex] = toVal;
-      updated[toIndex] = fromVal;
+      const fromKey = `${selectedWeek}-${fromIndex}`;
+      const toKey = `${selectedWeek}-${toIndex}`;
+      const fromVal = updated[fromKey] || [];
+      const toVal = updated[toKey] || [];
+      updated[fromKey] = toVal;
+      updated[toKey] = fromVal;
       return updated;
     });
 
     setExerciseSetLogs(prev => {
-      const updated: Record<string, SetDetail[]> = {};
+      const updated: Record<string, SetDetail[]> = { ...prev };
       Object.keys(prev).forEach(key => {
-        const [dayIdxStr, exIdxStr] = key.split('-');
+        const [weekStr, dayIdxStr, exIdxStr] = key.split('-');
+        if (parseInt(weekStr, 10) !== selectedWeek) return; // minggu lain dibiarkan, tidak disentuh
         const dayIdx = parseInt(dayIdxStr, 10);
         let newDayIdx = dayIdx;
         if (dayIdx === fromIndex) newDayIdx = toIndex;
         else if (dayIdx === toIndex) newDayIdx = fromIndex;
-        updated[`${newDayIdx}-${exIdxStr}`] = prev[key];
+        if (newDayIdx !== dayIdx) {
+          delete updated[key];
+          updated[`${selectedWeek}-${newDayIdx}-${exIdxStr}`] = prev[key];
+        }
       });
       return updated;
     });
 
-    saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlan);
+    saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlanByWeek);
   };
 
   const handleDayDragEnd = (event: DragEndEvent) => {
@@ -363,15 +416,16 @@ export const WorkoutView: React.FC = () => {
   const handleSaveDayName = async () => {
     if (!tempDayName.trim()) return;
     const updatedPlan = [...activePlan];
-    if (updatedPlan[selectedDay]) updatedPlan[selectedDay].name = tempDayName;
-    setActivePlan(updatedPlan); setIsEditingName(false);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, updatedPlan);
+    if (updatedPlan[selectedDay]) updatedPlan[selectedDay] = { ...updatedPlan[selectedDay], name: tempDayName };
+    const newPlanByWeek = { ...planByWeek, [selectedWeek]: updatedPlan };
+    setPlanByWeek(newPlanByWeek); setIsEditingName(false);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlanByWeek);
   };
 
   const handleSaveGoal = async () => {
     if (!tempGoal.trim()) return;
     setFormGoal(tempGoal); setIsEditingGoal(false);
-    await saveProgramToDB(formExp, formDays, tempGoal, selectedWeek, activePlan);
+    await saveProgramToDB(formExp, formDays, tempGoal, selectedWeek, planByWeek);
   };
 
   const openAddExercise = () => {
@@ -400,11 +454,13 @@ export const WorkoutView: React.FC = () => {
     const updatedPlan = [...activePlan];
     updatedPlan[selectedDay].exercises.splice(idx, 1);
     setCompletedExercises(prev => {
-      const dayCompleted = prev[selectedDay] || [];
-      return { ...prev, [selectedDay]: dayCompleted.filter(i => i !== idx).map(i => i > idx ? i - 1 : i) };
+      const dayKey = `${selectedWeek}-${selectedDay}`;
+      const dayCompleted = prev[dayKey] || [];
+      return { ...prev, [dayKey]: dayCompleted.filter(i => i !== idx).map(i => i > idx ? i - 1 : i) };
     });
-    setActivePlan(updatedPlan);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, updatedPlan);
+    const newPlanByWeek = { ...planByWeek, [selectedWeek]: updatedPlan };
+    setPlanByWeek(newPlanByWeek);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlanByWeek);
   };
 
   const handleSaveExercise = async () => {
@@ -412,13 +468,14 @@ export const WorkoutView: React.FC = () => {
     const updatedPlan = [...activePlan];
     if (editingExerciseIndex !== null) { updatedPlan[selectedDay].exercises[editingExerciseIndex] = exerciseForm; } 
     else { updatedPlan[selectedDay].exercises.push(exerciseForm); }
-    setActivePlan(updatedPlan); setIsExerciseModalOpen(false);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, updatedPlan);
+    const newPlanByWeek = { ...planByWeek, [selectedWeek]: updatedPlan };
+    setPlanByWeek(newPlanByWeek); setIsExerciseModalOpen(false);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlanByWeek);
   };
 
   const openSetLogModal = (idx: number) => {
     setActiveSetExerciseIdx(idx);
-    const logKey = `${selectedDay}-${idx}`;
+    const logKey = `${selectedWeek}-${selectedDay}-${idx}`;
     const targetExercise = activeWorkout.exercises[idx];
     const existingLogs = exerciseSetLogs[logKey];
 
@@ -455,7 +512,7 @@ export const WorkoutView: React.FC = () => {
 
   const handleSaveSetLogs = async () => {
     if (activeSetExerciseIdx === null) return;
-    const logKey = `${selectedDay}-${activeSetExerciseIdx}`;
+    const logKey = `${selectedWeek}-${selectedDay}-${activeSetExerciseIdx}`;
     
     setExerciseSetLogs(prev => ({ ...prev, [logKey]: tempSets }));
     
@@ -463,16 +520,18 @@ export const WorkoutView: React.FC = () => {
     if (updatedPlan[selectedDay] && updatedPlan[selectedDay].exercises[activeSetExerciseIdx]) {
       updatedPlan[selectedDay].exercises[activeSetExerciseIdx].sets = tempSets.length;
     }
-    setActivePlan(updatedPlan);
+    const newPlanByWeek = { ...planByWeek, [selectedWeek]: updatedPlan };
+    setPlanByWeek(newPlanByWeek);
     
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, updatedPlan);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, selectedWeek, newPlanByWeek);
 
     const isAllSetsDone = tempSets.length > 0 && tempSets.every(s => s.completed);
     setCompletedExercises(prev => {
-      const dayCompleted = prev[selectedDay] || [];
+      const dayKey = `${selectedWeek}-${selectedDay}`;
+      const dayCompleted = prev[dayKey] || [];
       const hasIdx = dayCompleted.includes(activeSetExerciseIdx);
-      if (isAllSetsDone && !hasIdx) { return { ...prev, [selectedDay]: [...dayCompleted, activeSetExerciseIdx] }; } 
-      else if (!isAllSetsDone && hasIdx) { return { ...prev, [selectedDay]: dayCompleted.filter(i => i !== activeSetExerciseIdx) }; }
+      if (isAllSetsDone && !hasIdx) { return { ...prev, [dayKey]: [...dayCompleted, activeSetExerciseIdx] }; } 
+      else if (!isAllSetsDone && hasIdx) { return { ...prev, [dayKey]: dayCompleted.filter(i => i !== activeSetExerciseIdx) }; }
       return prev;
     });
     
@@ -482,9 +541,10 @@ export const WorkoutView: React.FC = () => {
   const toggleExerciseCheck = (exerciseIndex: number, e: React.MouseEvent) => {
     e.stopPropagation();
     setCompletedExercises((prev) => {
-      const dayCompleted = prev[selectedDay] || [];
+      const dayKey = `${selectedWeek}-${selectedDay}`;
+      const dayCompleted = prev[dayKey] || [];
       const isChecked = dayCompleted.includes(exerciseIndex);
-      return { ...prev, [selectedDay]: isChecked ? dayCompleted.filter(i => i !== exerciseIndex) : [...dayCompleted, exerciseIndex] };
+      return { ...prev, [dayKey]: isChecked ? dayCompleted.filter(i => i !== exerciseIndex) : [...dayCompleted, exerciseIndex] };
     });
   };
 
@@ -502,15 +562,16 @@ export const WorkoutView: React.FC = () => {
     const MET_VALUE = 5.0;
     const calculatedCalories = Math.max(5, Math.round((MET_VALUE * userWeightKg * timer) / 3600));
 
-    const completedExerciseNames = completedExercises[selectedDay]
-      ? completedExercises[selectedDay].map(idx => activeWorkout?.exercises[idx]?.name).filter((n): n is string => !!n)
+    const dayKey = `${selectedWeek}-${selectedDay}`;
+    const completedExerciseNames = completedExercises[dayKey]
+      ? completedExercises[dayKey].map(idx => activeWorkout?.exercises[idx]?.name).filter((n): n is string => !!n)
       : [];
 
     const setLogsToInsert: PendingSession['set_logs'] = [];
     Object.keys(exerciseSetLogs).forEach(key => {
-      const [dayIdx, exIdx] = key.split('-');
-      if (parseInt(dayIdx) === selectedDay) {
-        const exerciseName = activeWorkout?.exercises[parseInt(exIdx)]?.name || 'Unknown Exercise';
+      const [weekStr, dayIdxStr, exIdxStr] = key.split('-');
+      if (parseInt(weekStr, 10) === selectedWeek && parseInt(dayIdxStr, 10) === selectedDay) {
+        const exerciseName = activeWorkout?.exercises[parseInt(exIdxStr, 10)]?.name || 'Unknown Exercise';
         exerciseSetLogs[key].forEach((set, idx) => {
           if (set.completed) {
             setLogsToInsert.push({
@@ -526,6 +587,7 @@ export const WorkoutView: React.FC = () => {
 
     return {
       workout_name: activeWorkout?.name || 'Workout Session',
+      week: selectedWeek,
       duration_seconds: timer,
       calories_burned: calculatedCalories,
       exercises_completed: completedExerciseNames,
@@ -556,6 +618,7 @@ export const WorkoutView: React.FC = () => {
       const { data: workoutLogRow, error: workoutError } = await supabase.from('workout_logs').insert({
         user_id: user.id,
         workout_name: payload.workout_name,
+        week: payload.week,
         duration_seconds: payload.duration_seconds,
         calories_burned: payload.calories_burned,
         exercises_completed: payload.exercises_completed,
@@ -795,8 +858,8 @@ export const WorkoutView: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {activeWorkout?.exercises.map((ex, idx) => {
-                  const isCompleted = (completedExercises[selectedDay] || []).includes(idx);
-                  const currentLogs = exerciseSetLogs[`${selectedDay}-${idx}`] || [];
+                  const isCompleted = (completedExercises[`${selectedWeek}-${selectedDay}`] || []).includes(idx);
+                  const currentLogs = exerciseSetLogs[`${selectedWeek}-${selectedDay}-${idx}`] || [];
                   const hasLogs = currentLogs.some(s => s.weight || s.completed);
 
                   return (
@@ -1051,11 +1114,11 @@ export const WorkoutView: React.FC = () => {
               <span className="text-[#FF5E00] text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Calories</span>
               <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{workoutStats.calories} <span className="text-lg font-bold text-white/90">kcal</span></span>
             </div>
-            {completedExercises[selectedDay] && completedExercises[selectedDay].length > 0 && (
+            {completedExercises[`${selectedWeek}-${selectedDay}`] && completedExercises[`${selectedWeek}-${selectedDay}`].length > 0 && (
               <div className="w-full flex flex-col items-center mb-3">
                 <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-2" style={textShadowStyle}>Exercises Completed</span>
                 <div className="flex flex-col items-center gap-1.5 w-full px-2">
-                  {completedExercises[selectedDay].map(idx => (
+                  {completedExercises[`${selectedWeek}-${selectedDay}`].map(idx => (
                     <span key={idx} className="text-[13.5px] sm:text-sm font-bold text-white text-center leading-tight tracking-wide" style={textShadowStyle}>
                       {activeWorkout?.exercises[idx]?.name}
                     </span>
