@@ -875,13 +875,13 @@ export const WorkoutView: React.FC = () => {
   };
 
   const downloadRecapPNG = async () => {
-    const element = document.getElementById('strava-sticker-card');
+    const element = document.getElementById('syncfit-recap-card');
     if (!element) return;
     try {
       const canvas = await html2canvas(element, { 
         scale: 3, backgroundColor: null, useCORS: true, logging: false,
         onclone: (clonedDoc) => {
-          const clonedEl = clonedDoc.getElementById('strava-sticker-card');
+          const clonedEl = clonedDoc.getElementById('syncfit-recap-card');
           if (clonedEl) { clonedEl.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; }
         }
       });
@@ -892,7 +892,8 @@ export const WorkoutView: React.FC = () => {
     } catch (e) { console.error(e); }
   };
 
-  const textShadowStyle = { textShadow: '0px 2px 10px rgba(0,0,0,0.9), 0px 1px 3px rgba(0,0,0,1)' };
+  // Label fase periodisasi dipakai ulang di recap card, sumbernya sama dengan tombol W1-W4 di atas.
+
 
   if (isLoading) return <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4"><div className="w-12 h-12 border-4 border-slate-200 border-t-[#FF5E00] rounded-full animate-spin"></div></div>;
 
@@ -1360,49 +1361,64 @@ export const WorkoutView: React.FC = () => {
       {isRecapModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[120] flex flex-col items-center justify-center p-4 overflow-y-auto">
           <div 
-            id="strava-sticker-card" 
-            className="bg-transparent text-white w-full max-w-sm flex flex-col items-center text-center p-6 mb-2"
-            style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+            id="syncfit-recap-card" 
+            className="relative w-full max-w-sm flex flex-col items-center text-center py-10 px-6 mb-2"
+            style={{ 
+              fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              textShadow: '0px 2px 8px rgba(0,0,0,0.75), 0px 1px 2px rgba(0,0,0,0.9)'
+            }}
           >
-            <div className="mb-4">
-              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Workout</span>
-              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{activeWorkout?.name}</span>
+            {/* WORKOUT + konteks minggu/goal */}
+            <span className="text-white/70 text-sm font-semibold uppercase block" style={{ letterSpacing: '5.5px' }}>Workout</span>
+            <span className="text-white/70 text-[11px] font-bold uppercase block mt-1.5" style={{ letterSpacing: '2px' }}>
+              Minggu {selectedWeek} · {formGoal}
+            </span>
+
+            {/* Nama hari latihan — hero utama */}
+            <h2 className="text-white font-extrabold mt-4" style={{ fontSize: '41px', letterSpacing: '-0.7px', lineHeight: 1.05 }}>
+              {activeWorkout?.name}
+            </h2>
+
+            {/* Kartu kaca tipis: TIME | CALORIES */}
+            <div 
+              className="flex items-center justify-center mt-10 rounded-2xl"
+              style={{ padding: '18px 22px', background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(255,255,255,0.18)' }}
+            >
+              <div className="flex flex-col items-center">
+                <span className="text-white/70 text-[10px] font-semibold uppercase" style={{ letterSpacing: '2px' }}>Time</span>
+                <span className="text-white font-extrabold mt-1.5" style={{ fontSize: '22px' }}>{formatTime(workoutStats.duration)}</span>
+              </div>
+              <div className="w-px bg-white/25 mx-7" style={{ height: '44px' }} />
+              <div className="flex flex-col items-center">
+                <span className="text-white/70 text-[10px] font-semibold uppercase" style={{ letterSpacing: '2px' }}>Calories</span>
+                <span className="text-[#FF8C42] font-extrabold mt-1.5" style={{ fontSize: '22px' }}>{workoutStats.calories} kcal</span>
+              </div>
             </div>
-            <div className="mb-4">
-              <span className="text-white/80 text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Time</span>
-              <span className="text-white font-black text-4xl tracking-tight block font-mono" style={textShadowStyle}>{formatTime(workoutStats.duration)}</span>
-            </div>
-            <div className="mb-4">
-              <span className="text-[#FF5E00] text-[11px] font-black uppercase tracking-widest block mb-0.5" style={textShadowStyle}>Calories</span>
-              <span className="text-white font-black text-3xl tracking-tight block" style={textShadowStyle}>{workoutStats.calories} <span className="text-lg font-bold text-white/90">kcal</span></span>
-            </div>
+
+            {/* Exercises completed */}
             {completedExercises[`${selectedWeek}-${selectedDay}`] && completedExercises[`${selectedWeek}-${selectedDay}`].length > 0 && (
-              <div className="w-full flex flex-col items-center mb-3">
-                <span className="text-white/70 text-[10px] font-black uppercase tracking-widest block mb-2" style={textShadowStyle}>Exercises Completed</span>
-                <div className="flex flex-col items-center gap-1.5 w-full px-2">
-                  {completedExercises[`${selectedWeek}-${selectedDay}`].map(idx => (
-                    <span key={idx} className="text-[13.5px] sm:text-sm font-bold text-white text-center leading-tight tracking-wide" style={textShadowStyle}>
-                      {activeWorkout?.exercises[idx]?.name}
-                    </span>
-                  ))}
-                </div>
+              <div className="mt-9 flex flex-col items-center gap-1.5">
+                <span className="text-white/70 text-[11px] font-semibold uppercase" style={{ letterSpacing: '2.7px' }}>Exercises Completed</span>
+                {completedExercises[`${selectedWeek}-${selectedDay}`].map(idx => (
+                  <span key={idx} className="text-white font-semibold" style={{ fontSize: '18px' }}>
+                    {activeWorkout?.exercises[idx]?.name}
+                  </span>
+                ))}
               </div>
             )}
-            <div className="mt-1 mb-1 flex justify-center">
-              {/* Ukuran kotak (96x64) sengaja disamakan dengan rasio asli dumbble.png (1536x1024 = 3:2).
-                  html2canvas tidak selalu menghormati object-fit saat render ke canvas, jadi object-contain
-                  saja tidak cukup — kotaknya sendiri harus sudah proporsional. */}
-              <img src="/dumbble.png" alt="Dumbbell Icon" className="w-24 h-16 object-contain bg-transparent drop-shadow-md" />
-            </div>
-            <div className="flex items-center justify-center mt-2 mb-1">
-              <span className="font-black text-3xl italic tracking-wider text-white" style={textShadowStyle}>SYNC<span className="text-[#FF5E00]">FIT</span></span>
+
+            {/* Logo SYNCFIT */}
+            <div className="mt-14">
+              <span className="font-extrabold italic" style={{ fontSize: '26px' }}>
+                <span className="text-white not-italic">SYNC</span><span className="text-[#FF5E00]">FIT</span>
+              </span>
             </div>
           </div>
 
           <div className="flex flex-row gap-3 w-full max-w-sm px-4">
             <button onClick={() => setIsRecapModalOpen(false)} className="flex-none py-4 px-6 bg-slate-800 hover:bg-slate-700 transition-colors rounded-2xl text-white font-bold">Tutup</button>
             <button onClick={downloadRecapPNG} className="flex-1 py-4 bg-[#FF5E00] hover:bg-[#E05300] transition-colors rounded-2xl text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
-              <Download className="w-5 h-5" /> Simpan Stiker
+              <Download className="w-5 h-5" /> Simpan Kartu Recap
             </button>
           </div>
         </div>
