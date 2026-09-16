@@ -261,6 +261,12 @@ export const WorkoutView: React.FC = () => {
   // supaya bisa dibandingkan tiap fetchProgram jalan tanpa ikut jadi dependency effect.
   const lastKnownProgramUpdatedAtRef = useRef<string | null>(null);
 
+  // B12: fetchProgram (dipanggil dari listener visibilitychange yang di-setup SEKALI saat mount)
+  // butuh tahu status isWorkoutActive TERKINI, bukan nilai beku saat mount — makanya perlu ref,
+  // bukan langsung baca state (closure useEffect dependency [] akan selalu lihat nilai lama).
+  const isWorkoutActiveRef = useRef(isWorkoutActive);
+  useEffect(() => { isWorkoutActiveRef.current = isWorkoutActive; }, [isWorkoutActive]);
+
   useEffect(() => {
     const fetchProgram = async () => {
       try {
@@ -279,7 +285,16 @@ export const WorkoutView: React.FC = () => {
           // bisa dipercaya lagi (kuncinya berbasis posisi, bukan identitas exercise), jadi
           // dikosongkan dan direkonstruksi ulang dari server lewat syncTodayProgressFromDB
           // (yang sudah akurat berkat workout_log_id).
-          if (lastKnownProgramUpdatedAtRef.current !== null && lastKnownProgramUpdatedAtRef.current !== data.updated_at) {
+          // B12: TAPI kalau sesi latihan sedang aktif, JANGAN PERNAH wipe — data lokal yang
+          // sedang dikerjakan user adalah satu-satunya sumber kebenaran selama sesi berjalan.
+          // `updated_at` sendiri berubah tiap kali user isi reps/beban (lewat saveProgramToDB),
+          // jadi kalau tidak di-guard, wipe ini bisa kepicu di tengah sesi cuma karena user
+          // pindah app sebentar lalu balik lagi — menghapus progres yang belum sempat diakhiri.
+          if (
+            lastKnownProgramUpdatedAtRef.current !== null &&
+            lastKnownProgramUpdatedAtRef.current !== data.updated_at &&
+            !isWorkoutActiveRef.current
+          ) {
             setExerciseSetLogs({});
             setCompletedExercises({});
           }
@@ -397,12 +412,17 @@ export const WorkoutView: React.FC = () => {
     }
   };
 
+  // B12: sinkronisasi dari server DIMATIKAN TOTAL selama sesi latihan aktif — bukan cuma bagian
+  // wipe-nya. Ini prinsip yang lebih aman: selama sesi berjalan, state lokal (exerciseSetLogs,
+  // completedExercises) adalah satu-satunya sumber kebenaran, titik. Begitu sesi diakhiri
+  // (isWorkoutActive jadi false), sinkronisasi jalan normal lagi dan merefleksikan sesi yang
+  // baru saja disimpan dengan benar.
   useEffect(() => {
-    if (activePlan.length > 0) {
+    if (activePlan.length > 0 && !isWorkoutActive) {
       syncTodayProgressFromDB(selectedWeek, selectedDay, activePlan, planResetAt);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWeek, selectedDay, activePlan, planResetAt]);
+  }, [selectedWeek, selectedDay, activePlan, planResetAt, isWorkoutActive]);
 
   // Sekarang selalu menyimpan SELURUH plan 4 minggu (bukan cuma minggu yang sedang dibuka) —
   // supaya minggu lain yang tidak diubah tetap utuh, tidak ikut tertimpa/hilang.
@@ -1379,16 +1399,18 @@ export const WorkoutView: React.FC = () => {
               {activeWorkout?.name}
             </h2>
 
-            {/* Kartu kaca tipis: TIME | CALORIES */}
+            {/* Kartu kaca tipis: TIME | CALORIES — pakai GRID 2 kolom SAMA LEBAR (bukan flex
+                shrink-wrap) supaya divider selalu presis di tengah, tidak peduli "75:30" vs
+                "440 kcal" beda panjang teksnya. html2canvas kadang tidak akurat menghitung ulang
+                lebar flex saat render ke canvas kalau kolomnya beda lebar konten. */}
             <div 
-              className="flex items-center justify-center mt-10 rounded-2xl"
-              style={{ padding: '18px 22px', background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(255,255,255,0.18)' }}
+              className="grid grid-cols-2 mt-10 rounded-2xl w-full max-w-[280px]"
+              style={{ padding: '18px 0', background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(255,255,255,0.18)' }}
             >
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center border-r border-white/25">
                 <span className="text-white/70 text-[10px] font-semibold uppercase" style={{ letterSpacing: '2px' }}>Time</span>
                 <span className="text-white font-extrabold mt-1.5" style={{ fontSize: '22px' }}>{formatTime(workoutStats.duration)}</span>
               </div>
-              <div className="w-px bg-white/25 mx-7" style={{ height: '44px' }} />
               <div className="flex flex-col items-center">
                 <span className="text-white/70 text-[10px] font-semibold uppercase" style={{ letterSpacing: '2px' }}>Calories</span>
                 <span className="text-[#FF8C42] font-extrabold mt-1.5" style={{ fontSize: '22px' }}>{workoutStats.calories} kcal</span>
