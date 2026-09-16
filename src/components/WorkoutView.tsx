@@ -192,7 +192,7 @@ export const WorkoutView: React.FC = () => {
   const [programUpdatedAt, setProgramUpdatedAt] = useState<string | null>(null);
   // Beda dari programUpdatedAt (berubah tiap kali APAPUN di plan disimpan, termasuk tukar hari) —
   // planResetAt CUMA berubah saat plan benar-benar di-generate ulang dari nol (isi exercise baru,
-  // 4 minggu sekaligus). Dipakai sebagai batas bawah pencarian sesi lama di syncTodayProgressFromDB,
+  // 4 minggu sekaligus). Dipakai sebagai batas bawah pencarian sesi lama di syncPlanProgressFromDB,
   // supaya drag & drop/edit (yang tidak mengubah isi, cuma posisi/1 minggu) tidak ikut menganggap
   // sesi sebelumnya "kadaluarsa".
   const [planResetAt, setPlanResetAt] = useState<string | null>(null);
@@ -283,7 +283,7 @@ export const WorkoutView: React.FC = () => {
           // posisi-posisi exercise bisa saja sudah berubah (swap/regenerate/edit — entah dari
           // device ini sendiri atau device lain). Data centang/reps LOKAL yang lama jadi tidak
           // bisa dipercaya lagi (kuncinya berbasis posisi, bukan identitas exercise), jadi
-          // dikosongkan dan direkonstruksi ulang dari server lewat syncTodayProgressFromDB
+          // dikosongkan dan direkonstruksi ulang dari server lewat syncPlanProgressFromDB
           // (yang sudah akurat berkat workout_log_id).
           // B12: TAPI kalau sesi latihan sedang aktif, JANGAN PERNAH wipe — data lokal yang
           // sedang dikerjakan user adalah satu-satunya sumber kebenaran selama sesi berjalan.
@@ -333,11 +333,13 @@ export const WorkoutView: React.FC = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // 3a: rekonstruksi status "selesai" + reps/beban dari data ASLI server (exercise_logs hari ini),
-  // bukan cuma dari localStorage device ini. Query dibatasi ke hari ini saja (created_at >= tengah malam)
-  // DAN ke minggu yang sedang dibuka (`week`), jadi centang di W1 tidak pernah kebaca sebagai
-  // centang di W2-W4 walau nama harinya kebetulan sama.
-  const syncTodayProgressFromDB = async (week: number, day: number, plan: DayPlan[], resetAt: string | null) => {
+  // 3a: rekonstruksi status "selesai" + reps/beban dari data ASLI server (exercise_logs), bukan
+  // cuma dari localStorage device ini. Dibatasi ke minggu yang sedang dibuka (`week`) + sejak plan
+  // ini terakhir di-generate ulang (`planResetAt`) — BUKAN dibatasi "hari ini saja". Program
+  // mingguan wajar dikerjakan di hari kalender berbeda-beda (Push Day Senin, Pull Day Rabu, dst),
+  // jadi centang tidak boleh "reset" cuma karena gonta-ganti tanggal — harus tetap berlaku
+  // sepanjang periode plan itu masih aktif.
+  const syncPlanProgressFromDB = async (week: number, day: number, plan: DayPlan[], resetAt: string | null) => {
     const dayPlan = plan[day];
     if (!dayPlan || !dayPlan.exercises || dayPlan.exercises.length === 0) return;
 
@@ -345,16 +347,9 @@ export const WorkoutView: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-
-      // Batas bawah pencarian sesi = mana yang LEBIH BARU antara "awal hari ini" vs
-      // "terakhir plan ini di-generate ulang dari nol" (BUKAN sekadar disimpan/diedit/ditukar).
-      // Drag & drop atau edit exercise TIDAK mengubah planResetAt, jadi sesi lama tetap valid
-      // dicari & dipindahkan ke slot barunya. Cuma generate ulang beneran yang mengganggap
-      // sesi sebelumnya "kadaluarsa".
-      const resetAtDate = resetAt ? new Date(resetAt) : startOfToday;
-      const cutoff = resetAtDate > startOfToday ? resetAtDate : startOfToday;
+      // Kalau plan belum pernah tercatat reset-nya (akun lama sebelum migrasi B8), jangan batasi
+      // tanggal sama sekali — biarkan epoch 0 supaya semua histori lama tetap valid dicari.
+      const cutoff = resetAt ? new Date(resetAt) : new Date(0);
 
       const { data: latestSession, error: sessionError } = await supabase
         .from('workout_logs')
@@ -419,7 +414,7 @@ export const WorkoutView: React.FC = () => {
   // baru saja disimpan dengan benar.
   useEffect(() => {
     if (activePlan.length > 0 && !isWorkoutActive) {
-      syncTodayProgressFromDB(selectedWeek, selectedDay, activePlan, planResetAt);
+      syncPlanProgressFromDB(selectedWeek, selectedDay, activePlan, planResetAt);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedWeek, selectedDay, activePlan, planResetAt, isWorkoutActive]);
@@ -957,7 +952,7 @@ export const WorkoutView: React.FC = () => {
 
       {!hasActivePlan ? (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 space-y-6 animate-fade-in">
-          <div className="w-24 h-24 bg-orange-500/10 rounded-full flex items-center justify-center mb-2"><Wand2 className="w-12 h-12 text-[#FF5E00]" /></div>
+          <div className="w-24 h-24 bg-orange-500/10 rounded-full flex items-center justify-center mb-2"><img src="/dumbble.png" alt="" className="object-contain" style={{ width: '56px', height: '37px' }} /></div>
           <div className="space-y-2 max-w-md"><h1 className="text-3xl font-black text-[#111827]">Belum Ada Program</h1><p className="text-sm text-slate-500 font-medium">SyncFit akan merancang jadwal mingguan dan periodisasi progresif yang disesuaikan.</p></div>
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <button onClick={() => setIsConfigModalOpen(true)} className="bg-[#FF5E00] hover:bg-[#E05300] text-white py-4 px-8 rounded-2xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 hover:scale-105"><Zap className="w-5 h-5 fill-current" /><span>Rancang Program Sekarang</span></button>
