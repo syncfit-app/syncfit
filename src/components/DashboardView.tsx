@@ -1,5 +1,5 @@
 // src/components/DashboardView.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Flame,
   Dumbbell,
@@ -12,11 +12,38 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 export const DashboardView: React.FC = () => {
   const navigate = useNavigate();
 
-  const mockUser = { streak: 6 };
+  // B2: streak sekarang diambil asli dari profiles.streak_count (ditulis WorkoutView saat
+  // sesi selesai) — bukan mock lagi. Jadwal hari ini & nutrisi masih mock (lihat TODO.md C1/C3,
+  // di luar scope B2).
+  const [streak, setStreak] = useState<number>(0);
+  const [isLoadingStreak, setIsLoadingStreak] = useState(true);
+
+  useEffect(() => {
+    const fetchStreak = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('streak_count')
+          .eq('id', user.id)
+          .single();
+        if (error) throw error;
+        if (data) setStreak(data.streak_count || 0);
+      } catch (error) {
+        console.error('Gagal mengambil data streak:', error);
+      } finally {
+        setIsLoadingStreak(false);
+      }
+    };
+    fetchStreak();
+  }, []);
+
   const mockWorkout = {
     title: 'Upper Body A',
     week: 'Minggu 2',
@@ -80,7 +107,7 @@ export const DashboardView: React.FC = () => {
               <div className="relative flex flex-col items-center justify-center mt-1">
                 <div className="flex items-center gap-0.5 text-[#FF5E00]">
                   <Flame className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
-                  <span className="font-black text-2xl sm:text-3xl text-white leading-none tracking-tight">{mockUser.streak}</span>
+                  <span className="font-black text-2xl sm:text-3xl text-white leading-none tracking-tight">{isLoadingStreak ? '-' : streak}</span>
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mt-1">Hari</span>
               </div>

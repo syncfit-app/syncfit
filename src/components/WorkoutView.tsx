@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download,
-  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2, GripVertical, Upload, FileWarning
+  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2, GripVertical, Upload, FileWarning, Flame
 } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
@@ -233,6 +233,8 @@ export const WorkoutView: React.FC = () => {
   const [activeDemo, setActiveDemo] = useState<GeneratedExercise | null>(null);
   const [isRecapModalOpen, setIsRecapModalOpen] = useState(false);
   const [workoutStats, setWorkoutStats] = useState({ duration: 0, calories: 0, date: '' });
+  // B2: hasil update XP/streak dari sesi TERAKHIR yang berhasil disimpan — ditampilkan di recap.
+  const [lastXpResult, setLastXpResult] = useState<{ xpGained: number; newStreak: number } | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempDayName, setTempDayName] = useState("");
   const [isEditingGoal, setIsEditingGoal] = useState(false);
@@ -759,6 +761,7 @@ export const WorkoutView: React.FC = () => {
     setSessionStartTime(now);
     localStorage.setItem('sfit_start_time', now.toString());
     setIsWorkoutActive(true); setIsTimerMinimized(false);
+    setLastXpResult(null);
   };
 
   // Menyusun payload sesi dari state saat ini (durasi berjalan, set yang sudah dicatat, dst).
@@ -813,6 +816,67 @@ export const WorkoutView: React.FC = () => {
   };
 
   // Insert ke workout_logs + exercise_logs. Return true/false, tidak pernah throw ke caller.
+  // B2: +2 XP per set yang diselesaikan. Streak berbasis JARAK ANTAR-SESI (bukan kalender
+  // minggu) — expected_gap = ceil(7/days) dari target program. Kalau sesi ini berjarak <=
+  // expected_gap hari kalender dari sesi sebelumnya, streak lanjut (+1). Kalau lebih jauh,
+  // streak reset ke 1. Sesi lain di HARI YANG SAMA tidak menambah streak lagi (mencegah exploit
+  // "buka-tutup sesi berkali-kali sehari" cuma buat naikin angka).
+  const updateXpAndStreak = async (userId: string, setLogsCount: number, currentSessionId: string, currentSessionCreatedAt: string): Promise<{ xpGained: number; newStreak: number } | null> => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('xp_points, streak_count')
+        .eq('id', userId)
+        .single();
+      if (!profile) return null;
+
+      const xpGained = setLogsCount * 2;
+      const newXp = (profile.xp_points || 0) + xpGained;
+
+      const { data: prevSession } = await supabase
+        .from('workout_logs')
+        .select('created_at')
+        .eq('user_id', userId)
+        .neq('id', currentSessionId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let newStreak = profile.streak_count || 0;
+      if (!prevSession) {
+        newStreak = 1; // sesi pertama sepanjang riwayat user
+      } else {
+        const prevDate = new Date(prevSession.created_at);
+        const currDate = new Date(currentSessionCreatedAt);
+        // Bandingkan tanggal kalender (bukan jam-menit-detik) supaya "sesi lain hari yang sama"
+        // konsisten terdeteksi walau jam latihannya beda.
+        const prevDay = Date.UTC(prevDate.getFullYear(), prevDate.getMonth(), prevDate.getDate());
+        const currDay = Date.UTC(currDate.getFullYear(), currDate.getMonth(), currDate.getDate());
+        const daysSince = Math.round((currDay - prevDay) / 86400000);
+
+        // Buffer ekstra berdasarkan pengalaman — Pemula paling longgar (biar tidak gampang
+        // patah semangat gara-gara sekali lewat jadwal), Mahir tanpa buffer (memang menyasar
+        // disiplin lebih ketat di level ini).
+        const experienceBuffer = formExp === 'Pemula' ? 2 : formExp === 'Menengah' ? 1 : 0;
+        const expectedGap = Math.max(1, Math.ceil(7 / (formDays || 4))) + experienceBuffer;
+
+        if (daysSince === 0) {
+          // sesi tambahan di hari yang sama — streak tidak berubah
+        } else if (daysSince <= expectedGap) {
+          newStreak = (profile.streak_count || 0) + 1;
+        } else {
+          newStreak = 1;
+        }
+      }
+
+      await supabase.from('profiles').update({ xp_points: newXp, streak_count: newStreak }).eq('id', userId);
+      return { xpGained, newStreak };
+    } catch (e) {
+      console.error('Gagal update XP & streak:', e);
+      return null;
+    }
+  };
+
   const saveSessionToDB = async (payload: PendingSession): Promise<boolean> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -828,7 +892,7 @@ export const WorkoutView: React.FC = () => {
         duration_seconds: payload.duration_seconds,
         calories_burned: payload.calories_burned,
         exercises_completed: payload.exercises_completed,
-      }).select('id').single();
+      }).select('id, created_at').single();
       if (workoutError) throw workoutError;
 
       if (payload.set_logs.length > 0) {
@@ -837,6 +901,11 @@ export const WorkoutView: React.FC = () => {
         );
         if (setError) throw setError;
       }
+
+      // XP/streak diupdate SETELAH insert utama berhasil — kalau ini gagal, sesi tetap
+      // dianggap tersimpan (jangan sampai gagal update XP bikin seluruh sesi diulang/hilang).
+      const xpResult = await updateXpAndStreak(user.id, payload.set_logs.length, workoutLogRow.id, workoutLogRow.created_at);
+      setLastXpResult(xpResult);
 
       return true;
     } catch (e) {
@@ -898,6 +967,13 @@ export const WorkoutView: React.FC = () => {
         onclone: (clonedDoc) => {
           const clonedEl = clonedDoc.getElementById('syncfit-recap-card');
           if (clonedEl) { clonedEl.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; }
+
+          // KOREKSI KHUSUS HASIL DOWNLOAD (tidak menyentuh tampilan modal live sama sekali) —
+          // html2canvas kadang render posisi ikon SVG sedikit beda dari browser asli.
+          // Ubah angka 'px' di translateY ini untuk geser NAIK (angka negatif, misal '-2px')
+          // atau TURUN (angka positif, misal '3px') KHUSUS di file PNG yang di-download.
+          const flameIcon = clonedDoc.getElementById('recap-streak-flame-icon') as HTMLElement | null;
+          if (flameIcon) { flameIcon.style.transform = 'translateY(3px)'; }
         }
       });
       const link = document.createElement('a');
@@ -1412,6 +1488,25 @@ export const WorkoutView: React.FC = () => {
               </div>
             </div>
 
+            {/* B2: XP & streak dari sesi ini — cuma muncul kalau berhasil dihitung.
+                PENTING: ikon Flame + teks dibungkus <div className="flex items-center">,
+                BUKAN <span> yang dipaksa flex. <span> itu elemen inline, memaksanya jadi flex
+                container bikin html2canvas salah hitung posisi anak-anaknya (ikon jadi
+                naik/turun/kepotong). <div> flex adalah pola yang SAMA PERSIS dengan kartu
+                TIME|CALORIES di atas yang sudah terbukti rapi di-capture. Kalau mau geser
+                besar/kecil ikonnya secara manual, cukup ubah angka di width/height Flame
+                (baris di bawah) — TIDAK perlu marginTop/verticalAlign sama sekali dengan pola ini. */}
+            {lastXpResult && (
+              <div className="mt-5 flex items-center justify-center gap-4">
+                <span className="text-[#FF8C42] font-extrabold" style={{ fontSize: '15px' }}>+{lastXpResult.xpGained} XP</span>
+                <span className="text-white/40">·</span>
+                <div className="flex items-center gap-1.5">
+                  <Flame id="recap-streak-flame-icon" style={{ width: '16px', height: '16px' }} color="#FF8C42" fill="#FF8C42" />
+                  <span className="text-white font-extrabold" style={{ fontSize: '15px' }}>{lastXpResult.newStreak} sesi beruntun</span>
+                </div>
+              </div>
+            )}
+
             {/* Exercises completed */}
             {completedExercises[`${selectedWeek}-${selectedDay}`] && completedExercises[`${selectedWeek}-${selectedDay}`].length > 0 && (
               <div className="mt-9 flex flex-col items-center gap-1.5">
@@ -1435,7 +1530,7 @@ export const WorkoutView: React.FC = () => {
           <div className="flex flex-row gap-3 w-full max-w-sm px-4">
             <button onClick={() => setIsRecapModalOpen(false)} className="flex-none py-4 px-6 bg-slate-800 hover:bg-slate-700 transition-colors rounded-2xl text-white font-bold">Tutup</button>
             <button onClick={downloadRecapPNG} className="flex-1 py-4 bg-[#FF5E00] hover:bg-[#E05300] transition-colors rounded-2xl text-white font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
-              <Download className="w-5 h-5" /> Simpan Kartu Recap
+              <Download className="w-5 h-5" /> Simpan Recap
             </button>
           </div>
         </div>

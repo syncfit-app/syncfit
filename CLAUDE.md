@@ -52,6 +52,7 @@ Semua tabel user-data punya `constraint ... foreign KEY (user_id/id) references 
 - State lokal sesi workout (hari terpilih, set logs, timer) disimpan ke `localStorage` dengan prefix `sfit_...` supaya tidak hilang saat refresh — pertahankan pola ini untuk state sejenis, jangan pindah ke solusi lain tanpa alasan kuat.
 - `saveProgramToDB` di `WorkoutView.tsx` adalah pola upsert program yang dipakai berulang (generate plan, edit nama hari, edit exercise, dsb) — reuse fungsi ini, jangan bikin fungsi upsert baru yang serupa.
 - Styling: Tailwind utility classes langsung di JSX, warna brand utama `#FF5E00` (oranye) dan `#111827` (dark navy), tidak ada file token/theme terpisah — ikuti warna ini untuk konsistensi.
+- **Hindari emoji di UI** (misal 🔥, ✅) — kesannya generic/AI-generated. Pakai ikon `lucide-react` yang sudah jadi standar di app ini (juga lebih stabil dirender `html2canvas` untuk elemen yang di-screenshot, seperti recap card).
 
 ## Aturan Kerja Teknis
 1. **Ikuti pola yang sudah ada.** Sebelum menulis komponen/util baru, cek dulu apakah sudah ada yang serupa di `src/`. Jangan duplikasi.

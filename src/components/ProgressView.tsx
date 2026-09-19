@@ -34,11 +34,14 @@ export const ProgressView: React.FC = () => {
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [currentWeight, setCurrentWeight] = useState<number>(0);
   const [isLoadingWeight, setIsLoadingWeight] = useState(true);
+  // B2: streak asli dari profiles.streak_count — digabung ke query weight yang sudah ada
+  // (satu request, bukan nambah query baru).
+  const [streak, setStreak] = useState<number>(0);
   
   // State untuk menyimpan ID pengguna yang sedang login
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
 
-  // Mengambil data user yang sedang login beserta berat badannya
+  // Mengambil data user yang sedang login beserta berat badan & streak-nya
   useEffect(() => {
     const fetchWeight = async () => {
       try {
@@ -48,17 +51,18 @@ export const ProgressView: React.FC = () => {
         
         setActiveUserId(user.id);
 
-        // Ambil data berat badan dari Supabase
+        // Ambil data berat badan & streak dari Supabase
         const { data, error } = await supabase
           .from('profiles')
-          .select('weight_kg')
+          .select('weight_kg, streak_count')
           .eq('id', user.id)
           .single();
 
         if (error) throw error;
         
-        if (data && data.weight_kg) {
-          setCurrentWeight(data.weight_kg);
+        if (data) {
+          if (data.weight_kg) setCurrentWeight(data.weight_kg);
+          setStreak(data.streak_count || 0);
         }
       } catch (error) {
         console.error("Gagal mengambil data berat badan:", error);
@@ -168,8 +172,8 @@ export const ProgressView: React.FC = () => {
           </div>
           <div>
             <span className="text-[11px] text-slate-400 font-extrabold uppercase tracking-wider">Konsistensi</span>
-            <p className="text-3xl font-black text-[#111827] tracking-tight mt-1">18 <span className="text-sm font-bold text-slate-400">Hari</span></p>
-            <span className="text-[11px] text-slate-500 font-bold mt-1 block">Streak aktif bulan ini</span>
+            <p className="text-3xl font-black text-[#111827] tracking-tight mt-1">{isLoadingWeight ? '-' : streak} <span className="text-sm font-bold text-slate-400">Sesi</span></p>
+            <span className="text-[11px] text-slate-500 font-bold mt-1 block">Streak sesi beruntun</span>
           </div>
         </div>
 
