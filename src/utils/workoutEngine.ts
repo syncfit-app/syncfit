@@ -64,6 +64,34 @@ const EXERCISE_DB: Record<string, GeneratedExercise[]> = {
   ]
 };
 
+// --- Kalkulasi Kalori (B3) ---
+// MET (Metabolic Equivalent of Task) dibedakan per kategori latihan, bukan flat 5.0 untuk semua
+// jenis exercise. Angka bersumber dari estimasi umum resistance training di Compendium of Physical
+// Activities — bukan angka presisi klinis, cukup untuk membedakan compound berat (Legs) dari
+// isolasi ringan, dan dari isometric hold (Core statis) yang usahanya lebih rendah walau "terasa berat".
+const MET_BY_CATEGORY: Record<string, number> = {
+  Legs: 6.0, // compound berat (squat, deadlift, dll) — melibatkan otot besar, effort paling tinggi
+  Push: 5.0,
+  Pull: 5.0,
+  Core: 4.0, // gerakan dinamis (crunches, russian twist, dll)
+};
+const MET_CORE_STATIC = 3.0; // isometric hold (plank, wall sit, side plank) — usaha statis, bukan dinamis
+const DEFAULT_MET = 5.0; // fallback untuk exercise custom/hasil edit manual yang tidak ada di EXERCISE_DB
+
+// Reverse lookup nama exercise -> kategori, dibangun otomatis dari EXERCISE_DB supaya tidak perlu
+// didaftar manual dua kali dan otomatis ikut kalau isi EXERCISE_DB berubah.
+const EXERCISE_NAME_TO_CATEGORY: Record<string, string> = {};
+Object.entries(EXERCISE_DB).forEach(([category, list]) => {
+  list.forEach((ex) => { EXERCISE_NAME_TO_CATEGORY[ex.name] = category; });
+});
+
+export const getMetValue = (exerciseName: string, isStatic?: boolean): number => {
+  const category = EXERCISE_NAME_TO_CATEGORY[exerciseName];
+  if (!category) return DEFAULT_MET;
+  if (category === 'Core' && isStatic) return MET_CORE_STATIC;
+  return MET_BY_CATEGORY[category] ?? DEFAULT_MET;
+};
+
 // Helper untuk menyusun Kombinasi Upper, Lower, dan Full Body secara seimbang
 const getUpperPool = (alt: boolean = false): GeneratedExercise[] => {
   const push = alt ? [...EXERCISE_DB.Push].reverse() : EXERCISE_DB.Push;

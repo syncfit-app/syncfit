@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
-import { generateWorkoutPlan, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
+import { generateWorkoutPlan, getMetValue, DayPlan, GeneratedExercise, Experience, Goal } from '../utils/workoutEngine';
 
 export interface SetDetail {
   weight: string;
@@ -768,19 +768,32 @@ export const WorkoutView: React.FC = () => {
   // Dipisah dari proses simpan supaya payload yang sama bisa dipakai ulang saat retry.
   const buildSessionPayload = (): PendingSession => {
     const userWeightKg = parseFloat(localStorage.getItem('sfit_user_weight') || '70');
-    const MET_VALUE = 5.0;
-    const calculatedCalories = Math.max(5, Math.round((MET_VALUE * userWeightKg * timer) / 3600));
 
     const dayKey = `${selectedWeek}-${selectedDay}`;
-    const completedExerciseNames = completedExercises[dayKey]
-      ? completedExercises[dayKey].map(idx => activeWorkout?.exercises[idx]?.name).filter((n): n is string => !!n)
-      : [];
+    const completedIndexes = completedExercises[dayKey] || [];
+    const completedExerciseNames = completedIndexes
+      .map(idx => activeWorkout?.exercises[idx]?.name)
+      .filter((n): n is string => !!n);
+
+    // B3: MET dihitung per SET yang benar-benar completed (bukan rata-rata flat per exercise),
+    // jadi exercise dengan 3 set completed kontribusinya 3x lebih besar ke rata-rata MET dibanding
+    // yang cuma 1 set completed — bukan dibobot sama rata seperti sebelumnya. Dihitung dari SEMUA
+    // exercise yang punya minimal 1 set completed di hari & minggu ini (digabung dengan loop
+    // `setLogsToInsert` di bawah supaya sumber datanya konsisten dengan set_logs yang disimpan ke
+    // DB), bukan cuma yang ditandai "selesai penuh" di `completedExercises`. Total durasi sesi tetap
+    // dipakai apa adanya (durasi per-exercise individual tidak dilacak). Fallback ke DEFAULT_MET
+    // (5.0, behavior lama) kalau tidak ada satupun set completed. Detail & sumber nilai MET per
+    // kategori ada di `getMetValue` (workoutEngine.ts).
+    let totalWeightedMet = 0;
+    let totalCompletedSets = 0;
 
     const setLogsToInsert: PendingSession['set_logs'] = [];
     Object.keys(exerciseSetLogs).forEach(key => {
       const [weekStr, dayIdxStr, exIdxStr] = key.split('-');
       if (parseInt(weekStr, 10) === selectedWeek && parseInt(dayIdxStr, 10) === selectedDay) {
-        const exerciseName = activeWorkout?.exercises[parseInt(exIdxStr, 10)]?.name || 'Unknown Exercise';
+        const exercise = activeWorkout?.exercises[parseInt(exIdxStr, 10)];
+        const exerciseName = exercise?.name || 'Unknown Exercise';
+        const metForExercise = getMetValue(exerciseName, exercise?.isStatic);
         exerciseSetLogs[key].forEach((set, idx) => {
           if (set.completed) {
             setLogsToInsert.push({
@@ -789,10 +802,15 @@ export const WorkoutView: React.FC = () => {
               reps_achieved: parseInt(set.reps) || 0,
               weight_kg: parseFloat(set.weight) || 0
             });
+            totalWeightedMet += metForExercise;
+            totalCompletedSets += 1;
           }
         });
       }
     });
+
+    const avgMet = totalCompletedSets > 0 ? totalWeightedMet / totalCompletedSets : 5.0;
+    const calculatedCalories = Math.max(5, Math.round((avgMet * userWeightKg * timer) / 3600));
 
     return {
       workout_name: activeWorkout?.name || 'Workout Session',
