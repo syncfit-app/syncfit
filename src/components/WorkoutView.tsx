@@ -1,11 +1,11 @@
 // src/components/WorkoutView.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import { supabase } from '../lib/supabase';
 import { 
   Dumbbell, Play, Info, Clock, CheckCircle2,
   Settings2, Calendar, Video, X, Wand2, Zap, Check, Minimize2, Square, Download,
-  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2, GripVertical, Upload, FileWarning, Flame
+  Edit2, Save, Trash2, Plus, AlertTriangle, RotateCw, Loader2, GripVertical, Upload, FileWarning, Flame, Trophy
 } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
@@ -22,6 +22,7 @@ export interface SetDetail {
 interface PendingSession {
   workout_name: string;
   week: number;
+  goal: string;
   duration_seconds: number;
   calories_burned: number;
   exercises_completed: string[];
@@ -192,7 +193,7 @@ export const WorkoutView: React.FC = () => {
   const [programUpdatedAt, setProgramUpdatedAt] = useState<string | null>(null);
   // Beda dari programUpdatedAt (berubah tiap kali APAPUN di plan disimpan, termasuk tukar hari) —
   // planResetAt CUMA berubah saat plan benar-benar di-generate ulang dari nol (isi exercise baru,
-  // 4 minggu sekaligus). Dipakai sebagai batas bawah pencarian sesi lama di syncPlanProgressFromDB,
+  // 4 minggu sekaligus). Dipakai sebagai batas bawah pencarian sesi lama di syncWeekProgressFromDB,
   // supaya drag & drop/edit (yang tidak mengubah isi, cuma posisi/1 minggu) tidak ikut menganggap
   // sesi sebelumnya "kadaluarsa".
   const [planResetAt, setPlanResetAt] = useState<string | null>(null);
@@ -232,7 +233,15 @@ export const WorkoutView: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDemo, setActiveDemo] = useState<GeneratedExercise | null>(null);
   const [isRecapModalOpen, setIsRecapModalOpen] = useState(false);
-  const [workoutStats, setWorkoutStats] = useState({ duration: 0, calories: 0, date: '' });
+  // Snapshot LENGKAP identitas sesi yang baru diakhiri/di-retry — diambil dari `payload`/`pendingSession`
+  // apa adanya, BUKAN dibaca ulang dari state live (selectedWeek/activeWorkout/completedExercises)
+  // saat modal recap render. Ini sengaja dipisah dari state navigasi karena B4 (auto-advance minggu)
+  // bisa mengubah selectedWeek/selectedDay TEPAT SETELAH sesi diakhiri — kalau recap masih baca state
+  // live, dia akan menampilkan minggu/hari BARU (hasil auto-advance) alih-alih sesi yang sebenarnya
+  // baru saja selesai.
+  const [workoutStats, setWorkoutStats] = useState({
+    duration: 0, calories: 0, date: '', week: 1, workoutName: '', goal: '', exercisesCompleted: [] as string[]
+  });
   // B2: hasil update XP/streak dari sesi TERAKHIR yang berhasil disimpan — ditampilkan di recap.
   const [lastXpResult, setLastXpResult] = useState<{ xpGained: number; newStreak: number } | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -258,6 +267,23 @@ export const WorkoutView: React.FC = () => {
 
   const hasActivePlan = activePlan.length > 0;
   const activeWorkout = activePlan[selectedDay];
+
+  // B4: definisi "1 minggu selesai" — SEMUA hari bertipe Workout di minggu yang sedang dibuka
+  // (selectedWeek) sudah punya SEMUA exercise-nya tercentang. Dihitung reaktif (useMemo) supaya
+  // banner "Minggu 4 Selesai" selalu akurat kapanpun dilihat — beda dari trigger AUTO-ADVANCE
+  // (W1-W3) di bawah yang sengaja HANYA jalan tepat setelah sesi diakhiri, bukan reaktif, supaya
+  // tidak ikut memindahkan minggu cuma karena user membuka lagi minggu lama yang kebetulan sudah
+  // selesai (banner cukup tampil informatif, tidak perlu pemicu event khusus).
+  const isCurrentWeekFullyComplete = useMemo(() => {
+    if (activePlan.length === 0) return false;
+    const workoutDays = activePlan.filter(d => d.type === 'Workout' && d.exercises.length > 0);
+    if (workoutDays.length === 0) return false;
+    return activePlan.every((day, dayIdx) => {
+      if (day.type !== 'Workout' || day.exercises.length === 0) return true;
+      const dayKey = `${selectedWeek}-${dayIdx}`;
+      return (completedExercises[dayKey] || []).length >= day.exercises.length;
+    });
+  }, [activePlan, completedExercises, selectedWeek]);
 
   // Nyimpen `updated_at` plan yang TERAKHIR diketahui device ini, di luar re-render (ref, bukan state)
   // supaya bisa dibandingkan tiap fetchProgram jalan tanpa ikut jadi dependency effect.
@@ -285,7 +311,7 @@ export const WorkoutView: React.FC = () => {
           // posisi-posisi exercise bisa saja sudah berubah (swap/regenerate/edit — entah dari
           // device ini sendiri atau device lain). Data centang/reps LOKAL yang lama jadi tidak
           // bisa dipercaya lagi (kuncinya berbasis posisi, bukan identitas exercise), jadi
-          // dikosongkan dan direkonstruksi ulang dari server lewat syncPlanProgressFromDB
+          // dikosongkan dan direkonstruksi ulang dari server lewat syncWeekProgressFromDB
           // (yang sudah akurat berkat workout_log_id).
           // B12: TAPI kalau sesi latihan sedang aktif, JANGAN PERNAH wipe — data lokal yang
           // sedang dikerjakan user adalah satu-satunya sumber kebenaran selama sesi berjalan.
@@ -341,9 +367,18 @@ export const WorkoutView: React.FC = () => {
   // mingguan wajar dikerjakan di hari kalender berbeda-beda (Push Day Senin, Pull Day Rabu, dst),
   // jadi centang tidak boleh "reset" cuma karena gonta-ganti tanggal — harus tetap berlaku
   // sepanjang periode plan itu masih aktif.
-  const syncPlanProgressFromDB = async (week: number, day: number, plan: DayPlan[], resetAt: string | null) => {
-    const dayPlan = plan[day];
-    if (!dayPlan || !dayPlan.exercises || dayPlan.exercises.length === 0) return;
+  //
+  // B4: sengaja disatukan untuk SELURUH hari Workout dalam 1 minggu sekaligus (bukan cuma
+  // `selectedDay` yang sedang dibuka seperti sebelumnya) — supaya deteksi "1 minggu selesai"
+  // (auto-advance & banner) akurat lintas device tanpa user harus membuka tiap tab hari satu-satu
+  // di device itu dulu. SELALU cuma 2 query total, TIDAK PEDULI berapa banyak hari Workout dalam
+  // program (5 hari atau 2 hari, tetap 2 query) — supaya tidak jadi N+1 yang boros kuota
+  // request Supabase free tier (limit 50rb request/hari) begitu user makin banyak.
+  const syncWeekProgressFromDB = async (week: number, plan: DayPlan[], resetAt: string | null) => {
+    const workoutDays = plan
+      .map((day, dayIdx) => ({ day, dayIdx }))
+      .filter(({ day }) => day.type === 'Workout' && day.exercises.length > 0);
+    if (workoutDays.length === 0) return;
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -353,59 +388,91 @@ export const WorkoutView: React.FC = () => {
       // tanggal sama sekali — biarkan epoch 0 supaya semua histori lama tetap valid dicari.
       const cutoff = resetAt ? new Date(resetAt) : new Date(0);
 
-      const { data: latestSession, error: sessionError } = await supabase
+      // QUERY 1/2: semua `workout_logs` minggu ini SEKALIGUS (tidak difilter per nama hari).
+      const { data: weekLogs, error: weekLogsError } = await supabase
         .from('workout_logs')
-        .select('id')
+        .select('id, workout_name, created_at')
         .eq('user_id', user.id)
-        .eq('workout_name', dayPlan.name)
         .eq('week', week)
         .gte('created_at', cutoff.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
-      if (sessionError || !latestSession) return;
+      if (weekLogsError || !weekLogs || weekLogs.length === 0) return;
 
-      const { data: todayLogs, error } = await supabase
+      // 1 hari bisa dikerjakan ulang beberapa kali dalam 1 siklus — cuma sesi PALING BARU per
+      // nama hari yang relevan buat status centang saat ini. weekLogs sudah urut terbaru dulu,
+      // jadi kemunculan pertama tiap workout_name = sesi terbarunya.
+      const latestLogIdByWorkoutName = new Map<string, string>();
+      weekLogs.forEach(log => {
+        if (!latestLogIdByWorkoutName.has(log.workout_name)) {
+          latestLogIdByWorkoutName.set(log.workout_name, log.id);
+        }
+      });
+
+      // QUERY 2/2: semua `exercise_logs` dari sesi-sesi terbaru di atas, SEKALIGUS lewat `.in(...)`.
+      const { data: allLogs, error: logsError } = await supabase
         .from('exercise_logs')
-        .select('exercise_key, set_number, reps_achieved, weight_kg')
-        .eq('workout_log_id', latestSession.id);
+        .select('workout_log_id, exercise_key, set_number, reps_achieved, weight_kg')
+        .in('workout_log_id', Array.from(latestLogIdByWorkoutName.values()));
 
-      if (error || !todayLogs || todayLogs.length === 0) return;
+      if (logsError || !allLogs || allLogs.length === 0) return;
+
+      const logsByWorkoutLogId = new Map<string, typeof allLogs>();
+      allLogs.forEach(l => {
+        const arr = logsByWorkoutLogId.get(l.workout_log_id) || [];
+        arr.push(l);
+        logsByWorkoutLogId.set(l.workout_log_id, arr);
+      });
 
       setExerciseSetLogs(prev => {
         const updated = { ...prev };
-        dayPlan.exercises.forEach((ex, idx) => {
-          const serverSets = todayLogs.filter(l => l.exercise_key === ex.name);
-          if (serverSets.length === 0) return;
+        workoutDays.forEach(({ day, dayIdx }) => {
+          const latestLogId = latestLogIdByWorkoutName.get(day.name);
+          if (!latestLogId) return;
+          const dayLogs = logsByWorkoutLogId.get(latestLogId) || [];
+          if (dayLogs.length === 0) return;
 
-          const key = `${week}-${day}-${idx}`;
-          const existing = updated[key] || [];
-          const merged: SetDetail[] = Array.from({ length: ex.sets }, (_, i) => existing[i] || { weight: '', reps: '', completed: false });
-          serverSets.forEach(s => {
-            const i = s.set_number - 1;
-            // Data server dianggap pelengkap, bukan penimpa — kalau device ini sendiri
-            // sudah punya progres lokal untuk set itu, biarkan (menghindari sesi aktif tertimpa).
-            if (i >= 0 && i < merged.length && !merged[i].completed) {
-              merged[i] = { weight: String(s.weight_kg), reps: String(s.reps_achieved), completed: true };
-            }
+          day.exercises.forEach((ex, exIdx) => {
+            const serverSets = dayLogs.filter(l => l.exercise_key === ex.name);
+            if (serverSets.length === 0) return;
+
+            const key = `${week}-${dayIdx}-${exIdx}`;
+            const existing = updated[key] || [];
+            const merged: SetDetail[] = Array.from({ length: ex.sets }, (_, i) => existing[i] || { weight: '', reps: '', completed: false });
+            serverSets.forEach(s => {
+              const i = s.set_number - 1;
+              // Data server dianggap pelengkap, bukan penimpa — kalau device ini sendiri
+              // sudah punya progres lokal untuk set itu, biarkan (menghindari sesi aktif tertimpa).
+              if (i >= 0 && i < merged.length && !merged[i].completed) {
+                merged[i] = { weight: String(s.weight_kg), reps: String(s.reps_achieved), completed: true };
+              }
+            });
+            updated[key] = merged;
           });
-          updated[key] = merged;
         });
         return updated;
       });
 
       setCompletedExercises(prev => {
-        const dayKey = `${week}-${day}`;
-        const updatedDay = new Set(prev[dayKey] || []);
-        dayPlan.exercises.forEach((ex, idx) => {
-          const serverSetsCount = todayLogs.filter(l => l.exercise_key === ex.name).length;
-          if (serverSetsCount >= ex.sets) updatedDay.add(idx);
+        const updated = { ...prev };
+        workoutDays.forEach(({ day, dayIdx }) => {
+          const latestLogId = latestLogIdByWorkoutName.get(day.name);
+          if (!latestLogId) return;
+          const dayLogs = logsByWorkoutLogId.get(latestLogId) || [];
+          if (dayLogs.length === 0) return;
+
+          const dayKey = `${week}-${dayIdx}`;
+          const updatedDay = new Set(prev[dayKey] || []);
+          day.exercises.forEach((ex, exIdx) => {
+            const serverSetsCount = dayLogs.filter(l => l.exercise_key === ex.name).length;
+            if (serverSetsCount >= ex.sets) updatedDay.add(exIdx);
+          });
+          updated[dayKey] = Array.from(updatedDay);
         });
-        return { ...prev, [dayKey]: Array.from(updatedDay) };
+        return updated;
       });
     } catch (e) {
-      console.error('Gagal sinkronisasi progres hari ini:', e);
+      console.error('Gagal sinkronisasi progres minggu ini:', e);
     }
   };
 
@@ -414,12 +481,14 @@ export const WorkoutView: React.FC = () => {
   // completedExercises) adalah satu-satunya sumber kebenaran, titik. Begitu sesi diakhiri
   // (isWorkoutActive jadi false), sinkronisasi jalan normal lagi dan merefleksikan sesi yang
   // baru saja disimpan dengan benar.
+  // B4: `selectedDay` SENGAJA dikeluarkan dari dependency — sinkronisasi sekarang mencakup SEMUA
+  // hari dalam minggu itu sekaligus, jadi ganti-ganti tab hari tidak perlu fetch ulang lagi.
   useEffect(() => {
     if (activePlan.length > 0 && !isWorkoutActive) {
-      syncPlanProgressFromDB(selectedWeek, selectedDay, activePlan, planResetAt);
+      syncWeekProgressFromDB(selectedWeek, activePlan, planResetAt);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWeek, selectedDay, activePlan, planResetAt, isWorkoutActive]);
+  }, [selectedWeek, activePlan, planResetAt, isWorkoutActive]);
 
   // Sekarang selalu menyimpan SELURUH plan 4 minggu (bukan cuma minggu yang sedang dibuka) —
   // supaya minggu lain yang tidak diubah tetap utuh, tidak ikut tertimpa/hilang.
@@ -486,6 +555,47 @@ export const WorkoutView: React.FC = () => {
     setSelectedWeek(week);
     setSelectedDay(0);
     saveCurrentWeekPreference(week);
+  };
+
+  // B4: dipanggil TEPAT SETELAH sesi diakhiri (bukan reaktif tiap render/navigasi) — lihat catatan
+  // di `isCurrentWeekFullyComplete` kenapa ini sengaja event-driven. Kalau minggu yang baru saja
+  // dikerjakan (week) sudah lengkap: W1-W3 otomatis pindah ke minggu berikutnya (behavior sama
+  // seperti klik tombol W1-W4 manual — murni ganti tampilan, TIDAK generate ulang/tulis plan_data).
+  // W4 SENGAJA tidak auto-pindah — banner pilihan ("Ulang ke Minggu 1" vs "Generate Program Baru")
+  // yang muncul di render berikutnya (dari isCurrentWeekFullyComplete) yang menangani itu.
+  const checkWeekCompletionAfterSession = (week: number, planForWeek: DayPlan[], completedMap: Record<string, number[]>) => {
+    const workoutDays = planForWeek.filter(d => d.type === 'Workout' && d.exercises.length > 0);
+    if (workoutDays.length === 0) return;
+    const isFullyComplete = planForWeek.every((day, dayIdx) => {
+      if (day.type !== 'Workout' || day.exercises.length === 0) return true;
+      const dayKey = `${week}-${dayIdx}`;
+      return (completedMap[dayKey] || []).length >= day.exercises.length;
+    });
+    if (!isFullyComplete || week >= 4) return;
+
+    setSelectedWeek(week + 1);
+    setSelectedDay(0);
+    saveCurrentWeekPreference(week + 1);
+  };
+
+  // B4: pilihan "Ulang ke Minggu 1" di banner Minggu 4 Selesai. Beda dari Generate Program Baru —
+  // plan_data TIDAK diubah sama sekali (periodisasi lama dipertahankan, sesuai kesepakatan), cuma
+  // current_week balik ke 1. Reset completedExercises & exerciseSetLogs untuk SEMUA 4 minggu
+  // (bukan cuma minggu 1) — kalau cuma minggu 1 yang direset, begitu siklus jalan lagi sampai
+  // minggu 2-4 nanti akan langsung "kelihatan sudah selesai" dari centang siklus SEBELUMNYA yang
+  // belum kehapus.
+  const handleRestartCycle = async () => {
+    setCompletedExercises({});
+    setExerciseSetLogs({});
+    setSelectedDay(0);
+    setSelectedWeek(1);
+    // saveProgramToDB dipanggil dengan isRegenerate=true dan plan_data yang SAMA PERSIS (planByWeek
+    // tidak diubah, bukan exercise baru) — supaya updated_at & plan_reset_at ikut ter-bump seperti
+    // regenerate beneran. Ini dipakai device LAIN untuk: (1) updated_at berubah -> trigger wipe
+    // local cache lama sebelum sync ulang (mekanisme sama seperti B9), (2) plan_reset_at berubah ->
+    // jadi batas bawah pencarian riwayat baru di syncWeekProgressFromDB (B13), supaya centang/reps
+    // SIKLUS LAMA tidak ikut ke-restore lagi setelah reset ini.
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, 1, planByWeek, true);
   };
 
   // D2: export program (4 minggu penuh) jadi file .syncfit yang bisa dibagikan.
@@ -815,6 +925,7 @@ export const WorkoutView: React.FC = () => {
     return {
       workout_name: activeWorkout?.name || 'Workout Session',
       week: selectedWeek,
+      goal: formGoal,
       duration_seconds: timer,
       calories_burned: calculatedCalories,
       exercises_completed: completedExerciseNames,
@@ -937,7 +1048,15 @@ export const WorkoutView: React.FC = () => {
     localStorage.removeItem('sfit_is_active'); localStorage.removeItem('sfit_start_time');
 
     const payload = buildSessionPayload();
-    setWorkoutStats({ duration: payload.duration_seconds, calories: payload.calories_burned, date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()) });
+    setWorkoutStats({
+      duration: payload.duration_seconds,
+      calories: payload.calories_burned,
+      date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()),
+      week: payload.week,
+      workoutName: payload.workout_name,
+      goal: payload.goal,
+      exercisesCompleted: payload.exercises_completed,
+    });
 
     setIsSavingSession(true);
     const success = await saveSessionToDB(payload);
@@ -953,6 +1072,11 @@ export const WorkoutView: React.FC = () => {
     }
 
     setSessionStartTime(null); setTimer(0);
+
+    // B4: cek kelengkapan minggu SETELAH state lokal (completedExercises) final untuk sesi ini —
+    // pakai selectedWeek/activePlan/completedExercises apa adanya (closure sesi ini), independen
+    // dari berhasil-tidaknya simpan ke DB (yang dicek di sini murni progres lokal centang).
+    checkWeekCompletionAfterSession(selectedWeek, activePlan, completedExercises);
   };
 
   // Dipanggil dari tombol "Coba Simpan Lagi" di banner peringatan.
@@ -963,7 +1087,15 @@ export const WorkoutView: React.FC = () => {
     setIsSavingSession(false);
 
     if (success) {
-      setWorkoutStats({ duration: pendingSession.duration_seconds, calories: pendingSession.calories_burned, date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()) });
+      setWorkoutStats({
+        duration: pendingSession.duration_seconds,
+        calories: pendingSession.calories_burned,
+        date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date()),
+        week: pendingSession.week,
+        workoutName: pendingSession.workout_name,
+        goal: pendingSession.goal || formGoal,
+        exercisesCompleted: pendingSession.exercises_completed,
+      });
       persistPendingSession(null);
       setIsRecapModalOpen(true);
     }
@@ -1160,6 +1292,29 @@ export const WorkoutView: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* B4: MINGGU 4 SELESAI — user pilih lanjut siklus lama atau program baru */}
+          {selectedWeek === 4 && isCurrentWeekFullyComplete && (
+            <div className="bg-gradient-to-br from-[#111827] to-slate-800 p-5 sm:p-6 rounded-3xl shadow-lg space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 shrink-0 rounded-2xl bg-[#FF5E00]/20 text-[#FF5E00] flex items-center justify-center">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white text-sm">Minggu 4 (Deload) Selesai!</h3>
+                  <p className="text-[11px] text-slate-300 font-medium">Siklus 4 minggu tuntas. Mau lanjut bagaimana?</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button onClick={handleRestartCycle} className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 border border-white/10">
+                  <RotateCw className="w-4 h-4" /> Ulang ke Minggu 1
+                </button>
+                <button onClick={() => setIsConfigModalOpen(true)} className="bg-[#FF5E00] hover:bg-[#E05300] text-white py-3 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2">
+                  Generate Program Baru
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* JADWAL */}
           <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
@@ -1480,12 +1635,12 @@ export const WorkoutView: React.FC = () => {
             {/* WORKOUT + konteks minggu/goal */}
             <span className="text-white/70 text-sm font-semibold uppercase block" style={{ letterSpacing: '5.5px' }}>Workout</span>
             <span className="text-white/70 text-[11px] font-bold uppercase block mt-1.5" style={{ letterSpacing: '2px' }}>
-              Minggu {selectedWeek} · {formGoal}
+              Minggu {workoutStats.week} · {workoutStats.goal}
             </span>
 
             {/* Nama hari latihan — hero utama */}
             <h2 className="text-white font-extrabold mt-4" style={{ fontSize: '41px', letterSpacing: '-0.7px', lineHeight: 1.05 }}>
-              {activeWorkout?.name}
+              {workoutStats.workoutName}
             </h2>
 
             {/* Kartu kaca tipis: TIME | CALORIES — pakai GRID 2 kolom SAMA LEBAR (bukan flex
@@ -1526,12 +1681,12 @@ export const WorkoutView: React.FC = () => {
             )}
 
             {/* Exercises completed */}
-            {completedExercises[`${selectedWeek}-${selectedDay}`] && completedExercises[`${selectedWeek}-${selectedDay}`].length > 0 && (
+            {workoutStats.exercisesCompleted.length > 0 && (
               <div className="mt-9 flex flex-col items-center gap-1.5">
                 <span className="text-white/70 text-[11px] font-semibold uppercase" style={{ letterSpacing: '2.7px' }}>Exercises Completed</span>
-                {completedExercises[`${selectedWeek}-${selectedDay}`].map(idx => (
-                  <span key={idx} className="text-white font-semibold" style={{ fontSize: '18px' }}>
-                    {activeWorkout?.exercises[idx]?.name}
+                {workoutStats.exercisesCompleted.map((name, i) => (
+                  <span key={i} className="text-white font-semibold" style={{ fontSize: '18px' }}>
+                    {name}
                   </span>
                 ))}
               </div>
