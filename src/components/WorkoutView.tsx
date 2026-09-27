@@ -1,5 +1,5 @@
 // src/components/WorkoutView.tsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { supabase } from '../lib/supabase';
 import { 
@@ -61,6 +61,15 @@ interface SyncFitProgramFile {
 // Perhatian khusus di `videoUrl`: field ini dipakai sebagai src <iframe>, jadi HARUS dibatasi cuma
 // domain video yang dipercaya (youtube embed) — kalau tidak, file jahat bisa menyisipkan URL
 // berbahaya yang jalan begitu user klik "Demo".
+// B5: field `rest` selalu format "<angka>s" hasil generate (lihat workoutEngine.ts, applyPeriodization
+// juga cuma memanipulasi angka di dalamnya) — tapi bisa jadi teks bebas kalau exercise diedit manual,
+// jadi ambil angka pertama yang ketemu & anggap satuannya detik. Fallback 60 detik kalau tidak ada
+// angka sama sekali (misal field dikosongkan), supaya rest timer tidak pernah gagal total.
+const parseRestSeconds = (rest: string): number => {
+  const match = rest?.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 60;
+};
+
 const isTrustedVideoUrl = (url: unknown): url is string => {
   if (typeof url !== 'string' || url.trim() === '') return false;
   try {
@@ -198,6 +207,16 @@ export const WorkoutView: React.FC = () => {
   // sesi sebelumnya "kadaluarsa".
   const [planResetAt, setPlanResetAt] = useState<string | null>(null);
 
+  // B-fix: status "Minggu 4 selesai, menunggu keputusan user" — TERSIMPAN di DB
+  // (`user_programs.week4_pending_decision`), bukan cuma dihitung live dari centang seperti
+  // `isCurrentWeekFullyComplete`. Alasan: kalau status centang lokal untuk sebagian hari di W4
+  // sempat tidak ter-restore (misal karena wipe cache B9, atau centang lokal-only yang tidak
+  // pernah sempat ke server), banner "Minggu 4 Selesai!" TIDAK BOLEH ikut hilang — begitu status
+  // "lengkap" ini terdeteksi sekali, dia harus tetap muncul sampai user benar-benar pilih
+  // "Ulang ke Minggu 1" atau "Generate Program Baru", bukan bisa dibalik lagi jadi "belum selesai"
+  // cuma karena data centang lokal berubah.
+  const [week4PendingDecision, setWeek4PendingDecision] = useState(false);
+
   // STATE LOKAL
   const [selectedDay, setSelectedDay] = useState(() => {
     const saved = localStorage.getItem('sfit_selected_day');
@@ -223,6 +242,27 @@ export const WorkoutView: React.FC = () => {
   });
   const [isTimerMinimized, setIsTimerMinimized] = useState(() => localStorage.getItem('sfit_timer_minimized') === 'true');
   const [timer, setTimer] = useState(0);
+
+  // B5: Rest timer antar-set. Disimpan sebagai TIMESTAMP KAPAN SELESAI (bukan "detik tersisa"
+  // yang di-decrement tiap tick) — pola sama seperti `sessionStartTime` — supaya tetap akurat
+  // walau tab di-background/di-throttle browser, atau app ditutup lalu dibuka lagi selama masih
+  // dalam durasi rest (dipulihkan dari localStorage). Kalau app BENAR-BENAR ditutup (bukan cuma
+  // background) dan baru dibuka lagi SETELAH waktu habis, suara/getar otomatis TIDAK bisa
+  // dibunyikan (keterbatasan platform web, JS tidak jalan saat tab tertutup) — begitu dibuka lagi,
+  // timer langsung tampil 00:00/selesai tanpa alert susulan.
+  const [restTimerEndAt, setRestTimerEndAt] = useState<number | null>(() => {
+    const saved = localStorage.getItem('sfit_rest_timer_end_at');
+    return saved ? parseInt(saved, 10) : null;
+  });
+  const [restTimerDuration, setRestTimerDuration] = useState<number>(() => {
+    const saved = localStorage.getItem('sfit_rest_timer_duration');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [restSecondsLeft, setRestSecondsLeft] = useState(0);
+  // Satu AudioContext dipakai ulang (dibuat/di-resume tepat di dalam klik user "tandai set
+  // selesai") supaya browser (terutama Safari iOS) tidak memblokir bunyi beep yang baru benar-benar
+  // dimainkan BELAKANGAN saat timer habis (dipicu dari interval, bukan langsung dari klik user).
+  const restAudioCtxRef = useRef<AudioContext | null>(null);
 
   // MODALS & FORM
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -268,23 +308,6 @@ export const WorkoutView: React.FC = () => {
   const hasActivePlan = activePlan.length > 0;
   const activeWorkout = activePlan[selectedDay];
 
-  // B4: definisi "1 minggu selesai" — SEMUA hari bertipe Workout di minggu yang sedang dibuka
-  // (selectedWeek) sudah punya SEMUA exercise-nya tercentang. Dihitung reaktif (useMemo) supaya
-  // banner "Minggu 4 Selesai" selalu akurat kapanpun dilihat — beda dari trigger AUTO-ADVANCE
-  // (W1-W3) di bawah yang sengaja HANYA jalan tepat setelah sesi diakhiri, bukan reaktif, supaya
-  // tidak ikut memindahkan minggu cuma karena user membuka lagi minggu lama yang kebetulan sudah
-  // selesai (banner cukup tampil informatif, tidak perlu pemicu event khusus).
-  const isCurrentWeekFullyComplete = useMemo(() => {
-    if (activePlan.length === 0) return false;
-    const workoutDays = activePlan.filter(d => d.type === 'Workout' && d.exercises.length > 0);
-    if (workoutDays.length === 0) return false;
-    return activePlan.every((day, dayIdx) => {
-      if (day.type !== 'Workout' || day.exercises.length === 0) return true;
-      const dayKey = `${selectedWeek}-${dayIdx}`;
-      return (completedExercises[dayKey] || []).length >= day.exercises.length;
-    });
-  }, [activePlan, completedExercises, selectedWeek]);
-
   // Nyimpen `updated_at` plan yang TERAKHIR diketahui device ini, di luar re-render (ref, bukan state)
   // supaya bisa dibandingkan tiap fetchProgram jalan tanpa ikut jadi dependency effect.
   const lastKnownProgramUpdatedAtRef = useRef<string | null>(null);
@@ -306,6 +329,7 @@ export const WorkoutView: React.FC = () => {
           setFormDays(data.days);
           setFormGoal(data.goal);
           setSelectedWeek(data.current_week);
+          setWeek4PendingDecision(!!data.week4_pending_decision);
 
           // B9: kalau versi plan yang baru di-fetch BEDA dari yang terakhir device ini tahu,
           // posisi-posisi exercise bisa saja sudah berubah (swap/regenerate/edit — entah dari
@@ -492,16 +516,25 @@ export const WorkoutView: React.FC = () => {
 
   // Sekarang selalu menyimpan SELURUH plan 4 minggu (bukan cuma minggu yang sedang dibuka) —
   // supaya minggu lain yang tidak diubah tetap utuh, tidak ikut tertimpa/hilang.
-  const saveProgramToDB = async (exp: Experience, days: number, goal: string, week: number, fullPlanByWeek: Record<number, DayPlan[]>, isRegenerate: boolean = false) => {
+  const saveProgramToDB = async (exp: Experience, days: number, goal: string, week: number, fullPlanByWeek: Record<number, DayPlan[]>, isRegenerate: boolean = false, nowOverride?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const now = new Date().toISOString();
+    // B15: kalau caller (handleGeneratePlan/handleRestartCycle/handleConfirmImport) sudah
+    // menghitung & meng-commit timestamp ini sendiri SECARA SINKRON (lewat nowOverride), pakai
+    // nilai yang SAMA PERSIS di sini — jangan hitung ulang `now` baru yang beda beberapa ms.
+    // Alasan detail ada di komentar B15 masing-masing handler tsb.
+    const now = nowOverride ?? new Date().toISOString();
     const payload: Record<string, unknown> = {
       user_id: user.id, experience: exp, days: days, goal: goal, current_week: week, plan_data: fullPlanByWeek, updated_at: now
     };
     // Cuma sertakan plan_reset_at kalau ini benar-benar generate ulang dari nol (isi exercise baru).
     // Kalau tidak disertakan, Supabase upsert TIDAK menimpa nilai lama di kolom ini.
-    if (isRegenerate) payload.plan_reset_at = now;
+    if (isRegenerate) {
+      payload.plan_reset_at = now;
+      // Regenerate beneran (baik "Generate Program Baru" maupun "Ulang ke Minggu 1") SELALU berarti
+      // user sudah membuat keputusan atas banner Minggu 4 — jadi flag pending-nya ikut dibersihkan.
+      payload.week4_pending_decision = false;
+    }
 
     await supabase.from('user_programs').upsert(payload);
     setProgramUpdatedAt(now);
@@ -521,6 +554,15 @@ export const WorkoutView: React.FC = () => {
     await supabase.from('user_programs').update({ current_week: week }).eq('user_id', user.id);
   };
 
+  // B-fix: update KHUSUS kolom week4_pending_decision — dipisah dari saveProgramToDB supaya
+  // tidak ikut menyentuh plan_data/updated_at (jadi tidak memicu wipe cache B9 di device lain
+  // cuma gara-gara banner Minggu 4 terdeteksi selesai).
+  const markWeek4PendingDecision = async (pending: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('user_programs').update({ week4_pending_decision: pending }).eq('user_id', user.id);
+  };
+
   useEffect(() => { localStorage.setItem('sfit_selected_day', JSON.stringify(selectedDay)); }, [selectedDay]);
   useEffect(() => { localStorage.setItem('sfit_completed_exercises', JSON.stringify(completedExercises)); }, [completedExercises]);
   useEffect(() => { localStorage.setItem('sfit_set_logs', JSON.stringify(exerciseSetLogs)); }, [exerciseSetLogs]);
@@ -536,6 +578,79 @@ export const WorkoutView: React.FC = () => {
     return () => clearInterval(interval);
   }, [isWorkoutActive, sessionStartTime]);
 
+  // B5: persist target selesai rest timer, supaya tahan reload/app ditutup-buka lagi selama
+  // durasinya belum lewat.
+  useEffect(() => {
+    if (restTimerEndAt) {
+      localStorage.setItem('sfit_rest_timer_end_at', restTimerEndAt.toString());
+      localStorage.setItem('sfit_rest_timer_duration', restTimerDuration.toString());
+    } else {
+      localStorage.removeItem('sfit_rest_timer_end_at');
+      localStorage.removeItem('sfit_rest_timer_duration');
+    }
+  }, [restTimerEndAt, restTimerDuration]);
+
+  // Beep sederhana pakai Web Audio API (tanpa file asset/dependency baru) + getar HP kalau
+  // didukung (Vibration API — cuma jalan di Android Chrome, iOS Safari tidak mendukung sama
+  // sekali, ini keterbatasan platform bukan bug kita).
+  const playRestTimerAlert = () => {
+    try {
+      const ctx = restAudioCtxRef.current;
+      if (ctx) {
+        const beepAt = (startOffset: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime + startOffset);
+          gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + startOffset + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startOffset + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + startOffset);
+          osc.stop(ctx.currentTime + startOffset + 0.3);
+        };
+        beepAt(0);
+        beepAt(0.35);
+      }
+    } catch { /* Audio gagal (misal browser blokir) — diam saja, jangan ganggu alur user */ }
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate([200, 100, 200]); } catch { /* tidak didukung, abaikan */ }
+    }
+  };
+
+  // B5: mulai rest timer — dipanggil dari user gesture langsung (klik tombol "tandai set
+  // selesai"), jadi AudioContext di-buat/di-resume DI SINI supaya beep yang benar-benar
+  // dimainkan belakangan (saat interval mendeteksi waktu habis) tidak diblokir browser.
+  const startRestTimer = (restLabel: string) => {
+    const seconds = parseRestSeconds(restLabel);
+    if (seconds <= 0) return;
+    if (!restAudioCtxRef.current) {
+      try { restAudioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); } catch { /* Web Audio tidak tersedia — beep dilewati, getar tetap jalan */ }
+    }
+    if (restAudioCtxRef.current?.state === 'suspended') {
+      restAudioCtxRef.current.resume().catch(() => {});
+    }
+    setRestTimerDuration(seconds);
+    setRestTimerEndAt(Date.now() + seconds * 1000);
+  };
+
+  useEffect(() => {
+    if (!restTimerEndAt) { setRestSecondsLeft(0); return; }
+    let alerted = false;
+    const tick = () => {
+      const secondsLeft = Math.max(0, Math.ceil((restTimerEndAt - Date.now()) / 1000));
+      setRestSecondsLeft(secondsLeft);
+      if (secondsLeft <= 0 && !alerted) {
+        alerted = true;
+        playRestTimerAlert();
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [restTimerEndAt]);
+
   // Generate program = generate SELURUH 4 minggu sekaligus (1 program bulanan yang koheren),
   // bukan cuma minggu yang sedang dibuka. Ini satu-satunya aksi yang benar-benar "mulai dari nol".
   const handleGeneratePlan = async () => {
@@ -543,9 +658,20 @@ export const WorkoutView: React.FC = () => {
     for (let w = 1; w <= 4; w++) {
       newPlanByWeek[w] = generateWorkoutPlan(formExp, formDays, formGoal as Goal, w);
     }
+    // B15 (bug): sebelumnya `planResetAt` lokal baru ter-update SETELAH `saveProgramToDB` selesai
+    // (await ke Supabase, ada jeda). Di antara reset state di bawah dan jeda itu, effect sinkronisasi
+    // (baris ~510) sempat jalan dengan `planResetAt` LAMA (dari siklus sebelumnya) begitu
+    // `selectedWeek` berubah ke 1 — akibatnya centang/catatan SIKLUS LAMA untuk minggu 1 ke-fetch
+    // ulang dari `workout_logs` lama dan "menghidupkan kembali" data yang barusan direset (sync
+    // cuma nambah, tidak pernah menghapus, jadi nempel permanen). Fix: hitung `now` DI SINI,
+    // commit ke `planResetAt` SEKALIGUS/SINKRON dengan reset state lain (batch yang sama), baru
+    // kirim `now` yang SAMA ke `saveProgramToDB` (nowOverride) supaya DB & state lokal konsisten.
+    const now = new Date().toISOString();
     setPlanByWeek(newPlanByWeek);
     setCompletedExercises({}); setExerciseSetLogs({}); setIsConfigModalOpen(false); setSelectedDay(0); setSelectedWeek(1);
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, 1, newPlanByWeek, true);
+    setWeek4PendingDecision(false);
+    setPlanResetAt(now);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, 1, newPlanByWeek, true, now);
   };
 
   // Pindah minggu sekarang MURNI ganti tampilan — setiap minggu sudah punya isinya sendiri
@@ -557,12 +683,13 @@ export const WorkoutView: React.FC = () => {
     saveCurrentWeekPreference(week);
   };
 
-  // B4: dipanggil TEPAT SETELAH sesi diakhiri (bukan reaktif tiap render/navigasi) — lihat catatan
-  // di `isCurrentWeekFullyComplete` kenapa ini sengaja event-driven. Kalau minggu yang baru saja
-  // dikerjakan (week) sudah lengkap: W1-W3 otomatis pindah ke minggu berikutnya (behavior sama
-  // seperti klik tombol W1-W4 manual — murni ganti tampilan, TIDAK generate ulang/tulis plan_data).
+  // B4: dipanggil TEPAT SETELAH sesi diakhiri (bukan reaktif tiap render/navigasi) — event-driven
+  // dengan sengaja, supaya tidak ikut memindahkan/menampilkan banner cuma karena user membuka lagi
+  // minggu lama yang kebetulan sudah selesai. Kalau minggu yang baru saja dikerjakan (week) sudah
+  // lengkap: W1-W3 otomatis pindah ke minggu berikutnya (behavior sama seperti klik tombol W1-W4
+  // manual — murni ganti tampilan, TIDAK generate ulang/tulis plan_data).
   // W4 SENGAJA tidak auto-pindah — banner pilihan ("Ulang ke Minggu 1" vs "Generate Program Baru")
-  // yang muncul di render berikutnya (dari isCurrentWeekFullyComplete) yang menangani itu.
+  // ditampilkan lewat flag `week4PendingDecision` yang di-set & disimpan persisten di sini.
   const checkWeekCompletionAfterSession = (week: number, planForWeek: DayPlan[], completedMap: Record<string, number[]>) => {
     const workoutDays = planForWeek.filter(d => d.type === 'Workout' && d.exercises.length > 0);
     if (workoutDays.length === 0) return;
@@ -571,7 +698,17 @@ export const WorkoutView: React.FC = () => {
       const dayKey = `${week}-${dayIdx}`;
       return (completedMap[dayKey] || []).length >= day.exercises.length;
     });
-    if (!isFullyComplete || week >= 4) return;
+    if (!isFullyComplete) return;
+
+    if (week >= 4) {
+      // W4 lengkap: JANGAN auto-pindah, tapi catat status "menunggu keputusan" secara PERSISTEN
+      // (bukan cuma andalkan isCurrentWeekFullyComplete yang reaktif ke centang live) — supaya
+      // banner tetap muncul di hari-hari berikutnya walau status centang lokal berubah/tidak
+      // lengkap ter-restore.
+      setWeek4PendingDecision(true);
+      markWeek4PendingDecision(true);
+      return;
+    }
 
     setSelectedWeek(week + 1);
     setSelectedDay(0);
@@ -585,17 +722,24 @@ export const WorkoutView: React.FC = () => {
   // minggu 2-4 nanti akan langsung "kelihatan sudah selesai" dari centang siklus SEBELUMNYA yang
   // belum kehapus.
   const handleRestartCycle = async () => {
+    // B15 (bug, root cause lengkap ada di komentar sama di handleGeneratePlan): hitung `now` DI SINI
+    // dan commit ke `planResetAt` SINKRON bareng reset state lain, supaya effect sinkronisasi
+    // (dipicu `selectedWeek` berubah ke 1) tidak sempat jalan dengan `planResetAt` LAMA dan
+    // menghidupkan lagi centang/catatan dari siklus sebelumnya.
+    const now = new Date().toISOString();
     setCompletedExercises({});
     setExerciseSetLogs({});
     setSelectedDay(0);
     setSelectedWeek(1);
+    setWeek4PendingDecision(false);
+    setPlanResetAt(now);
     // saveProgramToDB dipanggil dengan isRegenerate=true dan plan_data yang SAMA PERSIS (planByWeek
     // tidak diubah, bukan exercise baru) — supaya updated_at & plan_reset_at ikut ter-bump seperti
     // regenerate beneran. Ini dipakai device LAIN untuk: (1) updated_at berubah -> trigger wipe
     // local cache lama sebelum sync ulang (mekanisme sama seperti B9), (2) plan_reset_at berubah ->
     // jadi batas bawah pencarian riwayat baru di syncWeekProgressFromDB (B13), supaya centang/reps
     // SIKLUS LAMA tidak ikut ke-restore lagi setelah reset ini.
-    await saveProgramToDB(formExp, formDays, formGoal as Goal, 1, planByWeek, true);
+    await saveProgramToDB(formExp, formDays, formGoal as Goal, 1, planByWeek, true, now);
   };
 
   // D2: export program (4 minggu penuh) jadi file .syncfit yang bisa dibagikan.
@@ -669,12 +813,19 @@ export const WorkoutView: React.FC = () => {
   const handleConfirmImport = async () => {
     if (!pendingImport) return;
     const { experience, days, goal, plan_data } = pendingImport;
+    // B15: sama seperti handleGeneratePlan/handleRestartCycle — commit `planResetAt` SINKRON di sini
+    // supaya tidak race dengan effect sinkronisasi. Juga tambah reset `week4PendingDecision` yang
+    // sebelumnya kelewatan di path import ini (import program baru = keputusan atas banner Minggu 4
+    // sudah dibuat juga, kalau kebetulan lagi pending).
+    const now = new Date().toISOString();
     setFormExp(experience); setFormDays(days); setFormGoal(goal);
     setPlanByWeek(plan_data);
     setCompletedExercises({}); setExerciseSetLogs({});
     setIsConfigModalOpen(false); setSelectedDay(0); setSelectedWeek(1);
+    setWeek4PendingDecision(false);
+    setPlanResetAt(now);
     setPendingImport(null);
-    await saveProgramToDB(experience, days, goal, 1, plan_data, true);
+    await saveProgramToDB(experience, days, goal, 1, plan_data, true, now);
   };
 
   // D1: sensor drag pakai PointerSensor (nyala di mouse & touch/HP).
@@ -1293,8 +1444,11 @@ export const WorkoutView: React.FC = () => {
             </div>
           </div>
 
-          {/* B4: MINGGU 4 SELESAI — user pilih lanjut siklus lama atau program baru */}
-          {selectedWeek === 4 && isCurrentWeekFullyComplete && (
+          {/* B4/B-fix: MINGGU 4 SELESAI — user pilih lanjut siklus lama atau program baru.
+              Pakai week4PendingDecision (persisten di DB), BUKAN isCurrentWeekFullyComplete
+              (reaktif ke centang live) — supaya banner tidak hilang sendiri kalau status
+              centang lokal untuk sebagian hari di W4 berubah/gagal ter-restore. */}
+          {selectedWeek === 4 && week4PendingDecision && (
             <div className="bg-gradient-to-br from-[#111827] to-slate-800 p-5 sm:p-6 rounded-3xl shadow-lg space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 shrink-0 rounded-2xl bg-[#FF5E00]/20 text-[#FF5E00] flex items-center justify-center">
@@ -1407,6 +1561,28 @@ export const WorkoutView: React.FC = () => {
                 <button onClick={() => setIsSetModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center transition-colors hover:bg-slate-200"><X className="w-4 h-4" /></button>
               </div>
 
+              {/* B-fix: rest timer ditampilkan INLINE di dalam modal ini (bukan cuma widget
+                  mengambang di belakang layar) — soalnya modal ini full-screen (z-110), jadi
+                  widget mengambang tadi ketutup total selama modal terbuka. User jadi kepaksa
+                  tutup modal cuma buat lihat sisa waktu istirahat, padahal tutup modal via
+                  tombol X (bukan "Simpan Pencatatan") MEMBUANG catatan yang belum disimpan. */}
+              {restTimerEndAt !== null && (
+                <div className={`rounded-2xl px-4 py-3 flex items-center gap-3 transition-colors ${restSecondsLeft <= 0 ? 'bg-emerald-500' : 'bg-[#111827]'}`}>
+                  <div className="shrink-0 w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-wider">
+                      {restSecondsLeft <= 0 ? 'Istirahat Selesai!' : 'Istirahat'}
+                    </p>
+                    <p className="text-white font-mono font-black text-lg leading-tight">{formatTime(restSecondsLeft)}</p>
+                  </div>
+                  <button onClick={() => setRestTimerEndAt(null)} className="shrink-0 text-white/80 hover:text-white text-xs font-bold px-3 py-2 rounded-lg bg-white/10">
+                    {restSecondsLeft <= 0 ? 'Lanjut' : 'Lewati'}
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-3">
                 <div className="grid grid-cols-12 gap-2 text-[11px] font-black uppercase text-slate-400 px-1">
                   <span className="col-span-2">Set</span>
@@ -1420,7 +1596,14 @@ export const WorkoutView: React.FC = () => {
                     <div className="col-span-4"><input type="number" step="0.5" placeholder="kg" value={s.weight} onChange={(e) => handleUpdateSetRow(idx, 'weight', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827]" /></div>
                     <div className="col-span-4"><input type="text" placeholder={isStaticExercise ? 'detik (mis: 45s)' : 'reps'} value={s.reps} onChange={(e) => handleUpdateSetRow(idx, 'reps', e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-[#111827]" /></div>
                     <div className="col-span-2 flex items-center justify-center gap-1">
-                      <button onClick={() => handleUpdateSetRow(idx, 'completed', !s.completed)} className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.completed ? 'bg-emerald-500 text-white' : 'bg-white border text-slate-300'}`}><Check className="w-4 h-4" /></button>
+                      <button
+                        onClick={() => {
+                          const nowCompleted = !s.completed;
+                          handleUpdateSetRow(idx, 'completed', nowCompleted);
+                          if (nowCompleted) startRestTimer(currentExercise.rest);
+                        }}
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.completed ? 'bg-emerald-500 text-white' : 'bg-white border text-slate-300'}`}
+                      ><Check className="w-4 h-4" /></button>
                       {tempSets.length > 1 && <button onClick={() => handleRemoveSetRow(idx)} className="text-slate-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>}
                     </div>
                   </div>
@@ -1618,6 +1801,37 @@ export const WorkoutView: React.FC = () => {
               <Minimize2 className="w-4 h-4 text-slate-400 rotate-180" />
             </div>
           )}
+        </div>
+      )}
+
+      {/* REST TIMER (B5) — widget mengambang ini cuma perlu tampil saat modal "Catat Beban & Reps"
+          SEDANG TERTUTUP (misal: user sudah simpan & tutup modal, tapi masih istirahat sebelum
+          exercise berikutnya). Saat modal itu terbuka, versi INLINE di dalam modal (di atas) yang
+          menangani tampilannya — lihat catatan B-fix di sana. */}
+      {restTimerEndAt !== null && !isSetModalOpen && (
+        <div className="fixed bottom-28 sm:bottom-6 left-1/2 -translate-x-1/2 z-[65] w-[calc(100%-2rem)] max-w-xs">
+          <div className={`rounded-2xl px-4 py-3 shadow-xl flex items-center gap-3 transition-colors ${restSecondsLeft <= 0 ? 'bg-emerald-500' : 'bg-[#111827]'}`}>
+            <div className="shrink-0 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-wider">
+                {restSecondsLeft <= 0 ? 'Istirahat Selesai!' : 'Istirahat'}
+              </p>
+              <p className="text-white font-mono font-black text-lg leading-tight">{formatTime(restSecondsLeft)}</p>
+              {restTimerDuration > 0 && (
+                <div className="mt-1 h-1 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white/70 transition-all duration-300 ease-linear"
+                    style={{ width: `${Math.min(100, Math.max(0, (restSecondsLeft / restTimerDuration) * 100))}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <button onClick={() => setRestTimerEndAt(null)} className="shrink-0 text-white/80 hover:text-white text-xs font-bold px-3 py-2 rounded-lg bg-white/10">
+              {restSecondsLeft <= 0 ? 'Lanjut' : 'Lewati'}
+            </button>
+          </div>
         </div>
       )}
 
