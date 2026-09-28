@@ -1790,6 +1790,24 @@ export const WorkoutView: React.FC = () => {
             <div className="bg-white rounded-[2rem] p-8 w-full max-w-sm text-center shadow-2xl">
               <p className="text-[#111827] font-black text-xl mb-6">{activeWorkout?.name}</p>
               <div className="text-7xl font-black text-[#111827] font-mono mb-10">{formatTime(timer)}</div>
+              {/* Rest timer inline: overlay penuh ini (z-100) menutupi widget mengambang, jadi
+                  ditampilkan juga di sini — pola sama seperti di modal Catat Beban & Reps. */}
+              {restTimerEndAt !== null && (
+                <div className={`rounded-2xl px-4 py-3 mb-6 flex items-center gap-3 text-left transition-colors ${restSecondsLeft <= 0 ? 'bg-emerald-500' : 'bg-[#111827]'}`}>
+                  <div className="shrink-0 w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-wider">
+                      {restSecondsLeft <= 0 ? 'Istirahat Selesai!' : 'Istirahat'}
+                    </p>
+                    <p className="text-white font-mono font-black text-lg leading-tight">{formatTime(restSecondsLeft)}</p>
+                  </div>
+                  <button onClick={() => setRestTimerEndAt(null)} className="shrink-0 text-white/80 hover:text-white text-xs font-bold px-3 py-2 rounded-lg bg-white/10">
+                    {restSecondsLeft <= 0 ? 'Lanjut' : 'Lewati'}
+                  </button>
+                </div>
+              )}
               <div className="flex gap-3 justify-center">
                 <button onClick={() => setIsTimerMinimized(true)} className="p-4 rounded-2xl bg-slate-100"><Minimize2 className="w-6 h-6" /></button>
                 <button onClick={handleEndSession} className="flex-1 py-4 px-6 rounded-2xl bg-red-500 text-white font-black"><Square className="w-5 h-5 inline mr-2" /> Akhiri Sesi</button>
@@ -1804,12 +1822,14 @@ export const WorkoutView: React.FC = () => {
         </div>
       )}
 
-      {/* REST TIMER (B5) — widget mengambang ini cuma perlu tampil saat modal "Catat Beban & Reps"
-          SEDANG TERTUTUP (misal: user sudah simpan & tutup modal, tapi masih istirahat sebelum
-          exercise berikutnya). Saat modal itu terbuka, versi INLINE di dalam modal (di atas) yang
-          menangani tampilannya — lihat catatan B-fix di sana. */}
-      {restTimerEndAt !== null && !isSetModalOpen && (
-        <div className="fixed bottom-28 sm:bottom-6 left-1/2 -translate-x-1/2 z-[65] w-[calc(100%-2rem)] max-w-xs">
+      {/* REST TIMER (B5) — widget mengambang ini cuma perlu tampil saat tidak ada overlay penuh yang
+          menutupinya: modal "Catat Beban & Reps" (versi INLINE di dalam modal yang menangani) dan
+          overlay penuh timer sesi (versi inline di dalam kartu itu). Posisinya rata kanan, ditumpuk
+          DI ATAS pill timer sesi (kalau sesi aktif & timer di-minimize) supaya keduanya rapi dan
+          tidak saling menimpa seperti sebelumnya (dulu keduanya di bottom-28, satu di tengah lebar,
+          satu di kanan -> bertumpuk). */}
+      {restTimerEndAt !== null && !isSetModalOpen && !(isWorkoutActive && !isTimerMinimized) && (
+        <div className={`fixed right-4 sm:right-6 z-[65] w-64 ${isWorkoutActive ? 'bottom-44 sm:bottom-24' : 'bottom-28 sm:bottom-6'}`}>
           <div className={`rounded-2xl px-4 py-3 shadow-xl flex items-center gap-3 transition-colors ${restSecondsLeft <= 0 ? 'bg-emerald-500' : 'bg-[#111827]'}`}>
             <div className="shrink-0 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
               <Clock className="w-5 h-5 text-white" />
